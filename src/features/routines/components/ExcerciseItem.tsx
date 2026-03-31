@@ -1,6 +1,6 @@
 import { FC } from 'react';
 import { View, Image, Text, StyleSheet, ImageSourcePropType } from 'react-native';
-import { RutinePropsWithChildren } from '../util/types';
+import { RutinePropsWithChildren } from '@/core/types/types';
 
 const ExcerciseItem: FC<RutinePropsWithChildren> = ({ excercises }) => {
     const { src, repeticiones } = excercises;

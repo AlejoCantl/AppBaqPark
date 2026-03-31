@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, useEffect } from "react";
 import { useLoginAuthentication } from "./LoginAuthentication";
-import { LoginAuthentication } from "../util/types";
-import { supabase } from "../util/supabase";
+import { LoginAuthentication } from '@/core/types/types';
+import { supabase } from '@/core/api/supabase';
 import { Session } from "@supabase/supabase-js";
 
 export const AuthenticationContext = createContext<LoginAuthentication | undefined>(undefined);

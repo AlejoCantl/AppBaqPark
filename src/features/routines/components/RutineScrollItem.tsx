@@ -1,5 +1,5 @@
 import { FC } from 'react';
-import { RutinePropsWithChildren } from '../util/types';
+import { RutinePropsWithChildren } from '@/core/types/types';
 import ExcerciseItem from './ExcerciseItem';
 import { View, Text, StyleSheet, ScrollView } from 'react-native';
 

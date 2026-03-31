@@ -1,6 +1,6 @@
 import type React from "react"
 import { View, Text, TouchableOpacity, StyleSheet } from "react-native"
-import MaterialIcons from "react-native-vector-icons/MaterialIcons"
+import MaterialIcons from "@expo/vector-icons/MaterialIcons"
 
 interface RenderParksProps {
   item: any

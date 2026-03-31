@@ -1,8 +1,8 @@
 import { PanResponder } from "react-native";
 import { Animated } from "react-native";
-import { DRAWER_MAX_HEIGHT, DRAWER_MIN_HEIGHT, GOOGLE_MAPS_APIKEY } from "./constants";
+import { DRAWER_MAX_HEIGHT, DRAWER_MIN_HEIGHT, GOOGLE_MAPS_APIKEY } from "@/core/constants/constants";
 import * as Location from "expo-location";
-import { fetchParques, peticion } from "../util/fetchs.js";
+import { fetchParques, peticion } from '@/core/api/fetchs';
 
 
 export const operationPoints = (t) => {

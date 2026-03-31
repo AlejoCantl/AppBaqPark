@@ -1,6 +1,6 @@
 import {useState} from 'react';
-import { supabase } from '../util/supabase';
-import { LoginProps } from '../util/types';
+import { supabase } from '@/core/api/supabase';
+import { LoginProps } from '@/core/types/types';
 
 export const useLoginAuthentication = () => {
     const [data, setData] = useState<LoginProps>({ email: '', password: '', confirmPassword: '' });

@@ -1,10 +1,20 @@
-import React, { useRef, useState } from 'react';
-import { View, Text, StyleSheet, Image, TouchableOpacity, SafeAreaView, Dimensions, Animated, PanResponder } from 'react-native';
-import AccountButton from '../_components/AccountButton';
-import { useAuthentication } from '../auth/AuthenticationContext';
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, Image, TouchableOpacity, SafeAreaView, Dimensions } from 'react-native';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withSpring,
+  interpolate,
+  Extrapolation,
+} from 'react-native-reanimated';
+import { GestureDetector, Gesture } from 'react-native-gesture-handler';
+import AccountButton from '@/features/auth/components/AccountButton';
+import { useAuthentication } from '@/features/auth/context/AuthenticationContext';
 import { Ionicons } from '@expo/vector-icons';
-import { useModalContext } from '../_components/userModalDisplayContext';
-import RutineItem from '../_components/RutineItem';
+import { useModalContext } from '@/features/auth/context/userModalDisplayContext';
+import RutineItem from '@/features/routines/components/RutineItem';
+import theme from '@/core/theme/theme';
+
 const routineTypes = [
   { title: 'Rutinas Básicas', image: require('../../../assets/basic.png') },
   { title: 'Rutinas Intermedias', image: require('../../../assets/intermediate.png') },
@@ -13,90 +23,129 @@ const routineTypes = [
 ];
 
 const { height } = Dimensions.get('window');
-const COLLAPSED_HEIGHT = 60;
-const EXPANDED_HEIGHT = 250;
+const COLLAPSED_HEIGHT = 80;
+const EXPANDED_HEIGHT = 300;
+
 export default function Rutines() {
   const { open } = useModalContext();
   const { session } = useAuthentication();
-  const pan = useRef(new Animated.ValueXY()).current;
   const [expanded, setExpanded] = useState<boolean>(false);
 
-  const panResponder = PanResponder.create({
-    onMoveShouldSetPanResponder: () => true,
-    onPanResponderMove: (_, gestureState) => {
-      if (gestureState.dy < 0 || expanded) {
-        pan.y.setValue(Math.max(gestureState.dy, COLLAPSED_HEIGHT - EXPANDED_HEIGHT));
-      }
-    },
-    onPanResponderRelease: (_, gestureState) => {
-      if (gestureState.dy < -50 || (expanded && gestureState.dy > 50)) {
-        setExpanded(!expanded);
-        Animated.spring(pan.y, {
-          toValue: expanded ? 0 : COLLAPSED_HEIGHT - EXPANDED_HEIGHT,
-          useNativeDriver: false,
-        }).start();
+  const drawerHeight = useSharedValue(COLLAPSED_HEIGHT);
+  const ctxStartY = useSharedValue(0);
+
+  const toggleDrawer = () => {
+    if (!session) {
+      open();
+      return;
+    }
+    const newExpanded = !expanded;
+    setExpanded(newExpanded);
+    drawerHeight.value = withSpring(newExpanded ? EXPANDED_HEIGHT : COLLAPSED_HEIGHT, {
+      damping: 20,
+      stiffness: 150,
+    });
+  };
+
+  const panGesture = Gesture.Pan()
+    .onStart(() => {
+      ctxStartY.value = drawerHeight.value;
+    })
+    .onUpdate((event) => {
+      const newHeight = ctxStartY.value - event.translationY;
+      drawerHeight.value = Math.max(COLLAPSED_HEIGHT, Math.min(newHeight, EXPANDED_HEIGHT + 50));
+    })
+    .onEnd((event) => {
+      if (event.translationY < -50 || event.velocityY < -500) {
+        drawerHeight.value = withSpring(EXPANDED_HEIGHT, { damping: 20, stiffness: 150 });
+      } else if (event.translationY > 50 || event.velocityY > 500) {
+        drawerHeight.value = withSpring(COLLAPSED_HEIGHT, { damping: 20, stiffness: 150 });
       } else {
-        Animated.spring(pan.y, {
-          toValue: expanded ? COLLAPSED_HEIGHT - EXPANDED_HEIGHT : 0,
-          useNativeDriver: false,
-        }).start();
+        drawerHeight.value = withSpring(drawerHeight.value > (EXPANDED_HEIGHT + COLLAPSED_HEIGHT) / 2 ? EXPANDED_HEIGHT : COLLAPSED_HEIGHT, { damping: 20, stiffness: 150 });
       }
-    },
+    });
+
+  const animatedDrawerStyle = useAnimatedStyle(() => {
+    return {
+      height: drawerHeight.value,
+    };
   });
 
-  const animatedHeight = pan.y.interpolate({
-    inputRange: [COLLAPSED_HEIGHT - EXPANDED_HEIGHT, 0],
-    outputRange: [EXPANDED_HEIGHT, COLLAPSED_HEIGHT],
-    extrapolate: 'clamp',
+  const animatedDetailsStyle = useAnimatedStyle(() => {
+    return {
+      opacity: interpolate(
+        drawerHeight.value,
+        [COLLAPSED_HEIGHT, EXPANDED_HEIGHT - 50],
+        [0, 1],
+        Extrapolation.CLAMP
+      ),
+    };
   });
 
   return (
     <SafeAreaView style={styles.container}>
       <AccountButton />
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>Rutinas de Ejercicio</Text>
+        <Text style={styles.headerSubtitle}>Encuentra el plan perfecto para ti</Text>
+      </View>
       <View style={styles.routineGrid}>
         {routineTypes.map((routine, index) => (
-          <RutineItem key={index} routine={routine} SessionRequired={routine?.title==="Rutinas Personalizadas"?true:false} /> // Usa el nuevo componente
+          <RutineItem key={index} routine={routine} SessionRequired={routine?.title === "Rutinas Personalizadas" ? true : false} />
         ))}
       </View>
 
-      <Animated.View
-        style={[styles.progressContainer, { height: animatedHeight }]}
-        {...panResponder.panHandlers}
-        onTouchStart={!session?open:null}
-      >
-        <View style={styles.handle} />
-        <View style={styles.progressBar}>
-          <Text style={styles.progressText}>TU PROGRESO</Text>
-          {!session && <Ionicons name="lock-closed" size={24} color="white" />}
-          {session && (
-            <Ionicons
-              name={expanded ? "chevron-down" : "chevron-up"}
-              size={24}
-              color="white"
-            />
-          )}
-        </View>
+      <GestureDetector gesture={session ? panGesture : Gesture.Pan().enabled(false)}>
+        <Animated.View style={[styles.progressContainer, animatedDrawerStyle]}>
+          <TouchableOpacity onPress={toggleDrawer} style={{ width: '100%' }} activeOpacity={0.8}>
+            <View style={styles.handle} />
+            <View style={styles.progressBar}>
+              <View style={styles.progressTextContainer}>
+                <Ionicons name="stats-chart" size={24} color="#fff" />
+                <Text style={styles.progressText}>TU PROGRESO</Text>
+              </View>
+              {!session && <Ionicons name="lock-closed" size={24} color="rgba(255,255,255,0.7)" />}
+              {session && (
+                <Ionicons
+                  name={expanded ? "chevron-down" : "chevron-up"}
+                  size={24}
+                  color="rgba(255,255,255,0.8)"
+                />
+              )}
+            </View>
+          </TouchableOpacity>
 
-        {session && (
-          <Animated.View
-            style={[
-              styles.detailsContainer,
-              {
-                opacity: pan.y.interpolate({
-                  inputRange: [COLLAPSED_HEIGHT - EXPANDED_HEIGHT, 0],
-                  outputRange: [1, 0],
-                }),
-              },
-            ]}
-          >
-            <Text style={styles.detailText}>Días activos: 19</Text>
-            <Text style={styles.detailText}>Consumo de agua: Frecuente</Text>
-            <Text style={styles.detailText}>Días descansó: 10</Text>
-            <Text style={styles.detailText}>Promedio Calorías: 340-200 Kcal/día</Text>
-            <Text style={styles.detailText}>Condición física: Óptima</Text>
-          </Animated.View>
-        )}
-      </Animated.View>
+          {session && (
+            <Animated.View style={[styles.detailsContainer, animatedDetailsStyle]}>
+              <View style={styles.detailRow}>
+                <View style={styles.detailCard}>
+                  <Text style={styles.detailCardValue}>19</Text>
+                  <Text style={styles.detailCardLabel}>Días activos</Text>
+                </View>
+                <View style={styles.detailCard}>
+                  <Text style={styles.detailCardValue}>10</Text>
+                  <Text style={styles.detailCardLabel}>Días descanso</Text>
+                </View>
+              </View>
+              
+              <View style={styles.infoList}>
+                <View style={styles.infoListItem}>
+                  <Ionicons name="water-outline" size={20} color="#fff" />
+                  <Text style={styles.detailText}>Consumo de agua: Frecuente</Text>
+                </View>
+                <View style={styles.infoListItem}>
+                  <Ionicons name="flame-outline" size={20} color="#fff" />
+                  <Text style={styles.detailText}>Promedio Calorías: 340-200 Kcal/día</Text>
+                </View>
+                <View style={styles.infoListItem}>
+                  <Ionicons name="fitness-outline" size={20} color="#fff" />
+                  <Text style={styles.detailText}>Condición física: Óptima</Text>
+                </View>
+              </View>
+            </Animated.View>
+          )}
+        </Animated.View>
+      </GestureDetector>
     </SafeAreaView>
   );
 }
@@ -104,70 +153,108 @@ export default function Rutines() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.background,
+  },
+  header: {
+    paddingHorizontal: 20,
+    paddingTop: 60,
+    paddingBottom: 20,
+    alignItems: 'center',
+  },
+  headerTitle: {
+    fontSize: theme.fontSizes.xxl,
+    fontWeight: 'bold',
+    color: theme.colors.primary,
+    marginBottom: 8,
+  },
+  headerSubtitle: {
+    fontSize: theme.fontSizes.sm,
+    color: theme.colors.textMuted,
   },
   routineGrid: {
-    marginTop: 50,
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-around',
     padding: 16,
-    paddingBottom: height * 0.1,
-  },
-  routineItem: {
-    width: '45%',
-    aspectRatio: 1,
-    marginBottom: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#f0f0f0',
-    borderRadius: 8,
-  },
-  routineImage: {
-    width: '60%',
-    height: '60%',
-    resizeMode: 'contain',
-  },
-  routineText: {
-    marginTop: 8,
-    textAlign: 'center',
+    paddingBottom: height * 0.15,
   },
   progressContainer: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: '#4CAF50',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
+    backgroundColor: theme.colors.primary,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
     overflow: 'hidden',
+    ...theme.shadow.lg,
   },
   handle: {
     width: 40,
     height: 5,
-    backgroundColor: 'white',
+    backgroundColor: 'rgba(255,255,255,0.4)',
     borderRadius: 3,
     alignSelf: 'center',
-    marginTop: 10,
+    marginTop: 12,
   },
   progressBar: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 16,
+    paddingHorizontal: 24,
+    paddingVertical: 16,
+  },
+  progressTextContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
   },
   progressText: {
     color: 'white',
-    fontWeight: 'bold',
-    fontSize: 18,
+    fontWeight: '800',
+    fontSize: theme.fontSizes.lg,
+    letterSpacing: 1,
   },
   detailsContainer: {
+    paddingHorizontal: 24,
+    paddingTop: 10,
+  },
+  detailRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 20,
+  },
+  detailCard: {
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    borderRadius: 16,
     padding: 16,
-    paddingTop: 0,
+    width: '48%',
+    alignItems: 'center',
+  },
+  detailCardValue: {
+    color: '#fff',
+    fontSize: theme.fontSizes.xxxl,
+    fontWeight: 'bold',
+  },
+  detailCardLabel: {
+    color: 'rgba(255,255,255,0.8)',
+    fontSize: theme.fontSizes.sm,
+    marginTop: 4,
+  },
+  infoList: {
+    gap: 12,
+  },
+  infoListItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    padding: 12,
+    borderRadius: 12,
   },
   detailText: {
     color: 'white',
-    fontSize: 16,
-    marginBottom: 10,
+    fontSize: theme.fontSizes.sm,
+    fontWeight: '500',
   },
 });

@@ -1,5 +1,5 @@
 import { View, Text, TextInput, Pressable, StyleSheet, Alert } from 'react-native';
-import { useAuthentication } from '../auth/AuthenticationContext';
+import { useAuthentication } from '@/features/auth/context/AuthenticationContext';
 import { useRouter } from 'expo-router';
 import * as WebBrowser from "expo-web-browser";
 

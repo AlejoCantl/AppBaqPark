@@ -3,9 +3,9 @@ import { Text, View, ScrollView, StyleSheet } from 'react-native';
 import { router } from 'expo-router';
 import { FC } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import RutineHeader from '../_components/RutineHeader';
-import RutineProgress from '../_components/RutineProgress';
-import RutineScrollItem from '../_components/RutineScrollItem';
+import RutineHeader from '@/features/routines/components/RutineHeader';
+import RutineProgress from '@/features/routines/components/RutineProgress';
+import RutineScrollItem from '@/features/routines/components/RutineScrollItem';
 
 const rutinas = [
   {

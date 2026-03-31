@@ -1,8 +1,8 @@
 import type React from "react"
 import { StyleSheet, View, Text, Modal, ScrollView, TouchableOpacity } from "react-native"
 import { Button, Card, Divider } from "react-native-paper"
-import MaterialIcons from "react-native-vector-icons/MaterialIcons"
-import theme from "../../theme.js"
+import MaterialIcons from "@expo/vector-icons/MaterialIcons"
+import theme from '@/core/theme/theme'
 
 // Define the park type based on the actual data structure
 interface Park {

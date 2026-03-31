@@ -1,52 +1,54 @@
-"use client"
-
 import { useEffect, useState, useRef, useCallback, useMemo } from "react"
 import {
   StyleSheet,
   View,
   Text,
   TouchableOpacity,
-  Animated,
   FlatList,
   Modal,
   Alert,
   Image,
   ScrollView,
+  Platform,
 } from "react-native"
-import MapView, { PROVIDER_DEFAULT, Marker, Polyline } from "react-native-maps"
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withSpring,
+  interpolate,
+  Extrapolation,
+} from "react-native-reanimated"
+import MapComponent from '@/features/maps/components/MapComponent'
 import { StatusBar } from "expo-status-bar"
-import { ActivityIndicator, MD2Colors, Button, IconButton, Card, Chip, Searchbar } from "react-native-paper"
-import MaterialIcons from "react-native-vector-icons/MaterialIcons"
-import theme from "../../theme.js"
-import AccountButton from "../_components/AccountButton"
-import { InfoParks } from "../_components/InfoParks"
-import { tips } from "../util/messages.js"
+import { ActivityIndicator, MD2Colors, Button, IconButton, Chip, Searchbar } from "react-native-paper"
+import MaterialIcons from "@expo/vector-icons/MaterialIcons"
+import theme from '@/core/theme/theme'
+import AccountButton from '@/features/auth/components/AccountButton'
+import { InfoParks } from '@/features/maps/components/InfoParks'
+import { tips } from '@/core/constants/messages'
 import {
   operationPoints,
-  operationPanResponder,
   operationRequestLocation,
   operationHaverSineDistance,
   operationFindNearestPark,
   operationFetchRouter,
   operationHandleNearestParkPress,
   operationGetParques,
-} from "../util/functions"
-import { DRAWER_MIN_HEIGHT, DRAWER_MAX_HEIGHT } from "../util/constants.js"
-import { SkeletonItem } from "../_components/SkeletonItem"
-import { ParkInfoModal } from "../_components/ParkInfoModal"
+} from '@/shared/utils/functions'
+import { DRAWER_MIN_HEIGHT, DRAWER_MAX_HEIGHT } from '@/core/constants/constants'
+import { SkeletonItem } from '@/features/maps/components/SkeletonItem'
+import { ParkInfoModal } from '@/features/maps/components/ParkInfoModal'
 
-// Define the park type based on the actual data structure
 interface Park {
   id: number
-  column2: string // Park name
-  column3: string // Sector
-  column4: string // Address
-  column5: string | number // Neighborhood
+  column2: string
+  column3: string
+  column4: string
+  column5: string | number
   latitude: string | number
   longitude: string | number
 }
 
-// Define sector options based on the actual sectors in the data
 const sectorOptions = [
   { id: "RIOMAR", label: "Riomar", color: "#4CAF50" },
   { id: "METROPOLITANA", label: "Metropolitana", color: "#2196F3" },
@@ -55,6 +57,7 @@ const sectorOptions = [
   { id: "NORTE CENTRO HISTORICO", label: "Norte Centro Histórico", color: "#F44336" },
 ]
 
+// Web map placeholder was removed because MapComponent.web.tsx handles it now
 export default function SearchMaps() {
   const [showInfoContainer, setShowInfoContainer] = useState(false)
   const [location, setLocation] = useState(null)
@@ -72,98 +75,77 @@ export default function SearchMaps() {
   const [searchQuery, setSearchQuery] = useState("")
   const [isDrawerExpanded, setIsDrawerExpanded] = useState(false)
   const [activeSectorFilter, setActiveSectorFilter] = useState<string | null>(null)
-  const animation = useRef(new Animated.Value(DRAWER_MIN_HEIGHT)).current
   const mapRef = useRef(null)
 
-  const panResponder = useMemo(() => {
-    const customPanResponder = operationPanResponder(animation)
+  // ─── Drawer animation via Reanimated (replaces PanResponder) ─────────────────
+  const drawerHeight = useSharedValue(DRAWER_MIN_HEIGHT)
 
-    // Add listener to animation value to detect when drawer is expanded
-    animation.addListener(({ value }) => {
-      // Consider drawer expanded if it's more than halfway to max height
-      setIsDrawerExpanded(value > (DRAWER_MIN_HEIGHT + DRAWER_MAX_HEIGHT) / 2)
-    })
+  const drawerAnimatedStyle = useAnimatedStyle(() => ({
+    height: drawerHeight.value,
+  }))
 
-    return customPanResponder
-  }, [animation])
+  const detailOpacity = useAnimatedStyle(() => ({
+    opacity: interpolate(
+      drawerHeight.value,
+      [DRAWER_MIN_HEIGHT, (DRAWER_MIN_HEIGHT + DRAWER_MAX_HEIGHT) / 2, DRAWER_MAX_HEIGHT],
+      [0, 0.3, 1],
+      Extrapolation.CLAMP
+    ),
+  }))
 
-  // Custom toggle drawer that updates isDrawerExpanded state
   const toggleDrawer = useCallback(() => {
-    const newState = !isDrawerExpanded
-    setIsDrawerExpanded(newState)
+    const newExpanded = !isDrawerExpanded
+    setIsDrawerExpanded(newExpanded)
+    drawerHeight.value = withSpring(newExpanded ? DRAWER_MAX_HEIGHT : DRAWER_MIN_HEIGHT, {
+      damping: 22,
+      stiffness: 180,
+    })
+  }, [isDrawerExpanded])
 
-    // Animate to appropriate height
-    Animated.spring(animation, {
-      toValue: newState ? DRAWER_MAX_HEIGHT : DRAWER_MIN_HEIGHT,
-      useNativeDriver: false,
-    }).start()
-  }, [isDrawerExpanded, animation])
-
-  // Function to minimize the drawer
   const minimizeDrawer = useCallback(() => {
     setIsDrawerExpanded(false)
-    Animated.spring(animation, {
-      toValue: DRAWER_MIN_HEIGHT,
-      useNativeDriver: false,
-    }).start()
-  }, [animation])
+    drawerHeight.value = withSpring(DRAWER_MIN_HEIGHT, { damping: 22, stiffness: 180 })
+  }, [])
 
   const handlGetParques = useCallback(() => {
     operationGetParques(setParques)
   }, [])
 
-  const haversineDistance = useCallback((coords1, coords2) => operationHaverSineDistance(coords1, coords2), [])
+  const haversineDistance = useCallback(
+    (coords1, coords2) => operationHaverSineDistance(coords1, coords2),
+    []
+  )
 
   const memorizedParques = useMemo(() => {
-    if (!location?.coords || !parques) {
-      return []
-    }
-
+    if (!location?.coords || !parques) return []
     return parques.filter((parque) => {
       const { latitude, longitude } = parque
-
-      if (isNaN(Number.parseFloat(String(latitude))) || isNaN(Number.parseFloat(String(longitude)))) {
+      if (isNaN(Number.parseFloat(String(latitude))) || isNaN(Number.parseFloat(String(longitude))))
         return false
-      }
-
-      // Apply sector filter if active
-      if (activeSectorFilter && parque.column3 !== activeSectorFilter) {
-        return false
-      }
-
+      if (activeSectorFilter && parque.column3 !== activeSectorFilter) return false
       const distance = haversineDistance(location.coords, {
         latitude: Number.parseFloat(String(latitude)),
         longitude: Number.parseFloat(String(longitude)),
       })
-
       return distance <= 5
     })
   }, [location, parques, activeSectorFilter, haversineDistance])
 
-  // Filter parks based on search query and sector
   const filteredParks = useMemo(() => {
     if (!parques || parques.length === 0) return []
-
     return parques.filter((park) => {
-      // Skip parks with invalid coordinates
-      if (isNaN(Number.parseFloat(String(park.latitude))) || isNaN(Number.parseFloat(String(park.longitude)))) {
+      if (isNaN(Number.parseFloat(String(park.latitude))) || isNaN(Number.parseFloat(String(park.longitude))))
         return false
-      }
-
-      // Apply search query filter to park name (column2)
       const matchesSearch =
         searchQuery === "" || (park.column2 && park.column2.toLowerCase().includes(searchQuery.toLowerCase()))
-
-      // Apply sector filter if active
       const matchesSector = !activeSectorFilter || park.column3 === activeSectorFilter
-
       return matchesSearch && matchesSector
     })
   }, [parques, searchQuery, activeSectorFilter])
 
   const findNearestPark = useCallback(
     (userCoords, parks) => operationFindNearestPark(userCoords, parks, haversineDistance),
-    [haversineDistance],
+    [haversineDistance]
   )
 
   const fetchRoute = useCallback(async (startCoords, park) => {
@@ -181,60 +163,33 @@ export default function SearchMaps() {
     }
   }, [location, parques, handlGetParques])
 
-  // Agregar un console.log para depurar los datos que estamos recibiendo
-  useEffect(() => {
-    if (parques.length > 0) {
-      console.log("Parques cargados:", parques.length)
-      console.log("Primer parque:", parques[0])
-      console.log("Parques filtrados:", filteredParks.length)
-      console.log("Parques memorizados:", memorizedParques.length)
-    }
-  }, [parques, filteredParks, memorizedParques])
-
-  // Function to center the map on a specific park
   const centerMapOnPark = useCallback(
     (park: Park) => {
       if (mapRef.current && park) {
         const latitude = Number.parseFloat(String(park.latitude))
         const longitude = Number.parseFloat(String(park.longitude))
-
         if (!isNaN(latitude) && !isNaN(longitude)) {
-          mapRef.current.animateToRegion(
-            {
-              latitude,
-              longitude,
-              latitudeDelta: 0.01,
-              longitudeDelta: 0.01,
-            },
-            500,
-          ) // 500ms animation duration
+          mapRef.current.animateToRegion({ latitude, longitude, latitudeDelta: 0.01, longitudeDelta: 0.01 }, 500)
         }
       }
     },
-    [mapRef],
+    [mapRef]
   )
 
-  // Updated function to handle park press with the complete sequence
   const handleParkPress = useCallback(
     (park: Park) => {
-      // 1. Minimize the drawer first
       minimizeDrawer()
-
-      // 2. Center the map on the selected park (with a slight delay to allow drawer animation)
       setTimeout(() => {
         centerMapOnPark(park)
-
-        // 3. Open the park modal (with a slight delay for better UX)
         setTimeout(() => {
           setSelectedPark(park)
           setShowParkModal(true)
         }, 300)
       }, 300)
     },
-    [minimizeDrawer, centerMapOnPark],
+    [minimizeDrawer, centerMapOnPark]
   )
 
-  // Function to handle marker press (directly from map)
   const handleMarkerPress = useCallback((park: Park) => {
     setSelectedPark(park)
     setShowParkModal(true)
@@ -242,27 +197,23 @@ export default function SearchMaps() {
 
   const renderParkItem = useCallback(
     ({ item }) => {
-      if (isLoading || !item?.id) {
-        return <SkeletonItem />
-      }
-
+      if (isLoading || !item?.id) return <SkeletonItem />
       return (
-        <TouchableOpacity onPress={() => handleParkPress(item)}>
+        <TouchableOpacity onPress={() => handleParkPress(item)} activeOpacity={0.7}>
           <View style={styles.parkItem}>
-            <View style={styles.parkIcon}>
-              <MaterialIcons name="park" size={24} color="#4CAF50" />
+            <View style={styles.parkIconBadge}>
+              <MaterialIcons name="park" size={22} color={theme.colors.secondary} />
             </View>
             <View style={styles.parkInfo}>
-              <Text style={styles.parkName}>{item.column2}</Text>
-              <Text style={styles.parkDescription} numberOfLines={1}>
-                {item.column3}
-              </Text>
+              <Text style={styles.parkName} numberOfLines={1}>{item.column2}</Text>
+              <Text style={styles.parkDescription} numberOfLines={1}>{item.column3}</Text>
             </View>
+            <MaterialIcons name="chevron-right" size={20} color={theme.colors.secondary} />
           </View>
         </TouchableOpacity>
       )
     },
-    [isLoading, handleParkPress],
+    [isLoading, handleParkPress]
   )
 
   const handleNearestParkPress = useCallback(() => {
@@ -274,7 +225,7 @@ export default function SearchMaps() {
       findNearestPark,
       location,
       memorizedParques,
-      fetchRoute,
+      fetchRoute
     )
   }, [location, memorizedParques, findNearestPark, fetchRoute, selectedButton])
 
@@ -285,11 +236,7 @@ export default function SearchMaps() {
       setSelectedButton("optimo")
       setNearestPark(null)
       setRouteCoordinates([])
-      Alert.alert(
-        "Parque Óptimo",
-        "Esta función aún no está implementada. Aquí se agregará el algoritmo para encontrar el parque óptimo en el futuro.",
-        [{ text: "OK" }],
-      )
+      Alert.alert("Parque Óptimo", "Esta función aún no está implementada.", [{ text: "OK" }])
     }
   }, [selectedButton])
 
@@ -299,213 +246,195 @@ export default function SearchMaps() {
     setShowTipModal(true)
   }, [])
 
-  // Function to toggle sector filter
   const toggleSectorFilter = useCallback((sectorId: string) => {
-    setActiveSectorFilter((prevSector) => (prevSector === sectorId ? null : sectorId))
+    setActiveSectorFilter((prev) => (prev === sectorId ? null : sectorId))
   }, [])
 
-  // Function to clear all filters
   const clearFilters = useCallback(() => {
     setActiveSectorFilter(null)
     setSearchQuery("")
   }, [])
 
-  // Function to handle showing route to selected park
   const handleShowRoute = useCallback(
     (park) => {
       if (location && park) {
         setShowParkModal(false)
-
-        // Set the selected button to show we're in route mode
         setSelectedButton("custom")
-
-        // Calculate and show the route
         fetchRoute(
-          {
-            latitude: location.coords.latitude,
-            longitude: location.coords.longitude,
-          },
+          { latitude: location.coords.latitude, longitude: location.coords.longitude },
           {
             latitude: Number.parseFloat(String(park.latitude)),
             longitude: Number.parseFloat(String(park.longitude)),
-          },
+          }
         )
-
-        // Animate to show both the user and the park
         mapRef.current?.fitToCoordinates(
           [
-            {
-              latitude: location.coords.latitude,
-              longitude: location.coords.longitude,
-            },
+            { latitude: location.coords.latitude, longitude: location.coords.longitude },
             {
               latitude: Number.parseFloat(String(park.latitude)),
               longitude: Number.parseFloat(String(park.longitude)),
             },
           ],
-          {
-            edgePadding: { top: 50, right: 50, bottom: 50, left: 50 },
-            animated: true,
-          },
+          { edgePadding: { top: 50, right: 50, bottom: 50, left: 50 }, animated: true }
         )
       }
     },
-    [location, fetchRoute, mapRef],
+    [location, fetchRoute, mapRef]
   )
 
-  // Get marker color based on sector
   const getMarkerColor = useCallback((park: Park) => {
-    const sectorOption = sectorOptions.find((option) => option.id === park.column3)
-    return sectorOption ? sectorOption.color : "#4CAF50" // Default to green if not found
+    const sector = sectorOptions.find((s) => s.id === park.column3)
+    return sector ? sector.color : "#4CAF50"
   }, [])
 
   if (!location) {
     return (
-      <View style={{ ...styles.container, flex: 1, justifyContent: "center" }}>
-        <ActivityIndicator size={100} color={MD2Colors.green600} />
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size={80} color={theme.colors.secondary} />
+        <Text style={styles.loadingText}>Obteniendo ubicación...</Text>
       </View>
     )
   }
 
-  const initialRegion = {
-    ...location.coords,
-    latitudeDelta: 0.01,
-    longitudeDelta: 0.01,
-  }
+  const initialRegion = { ...location.coords, latitudeDelta: 0.01, longitudeDelta: 0.01 }
 
   return (
     <View style={styles.container}>
-      <StatusBar style="dark" />
+      <StatusBar style="light" />
       <InfoParks setShowInfoContainer={setShowInfoContainer} showInfoContainer={showInfoContainer} />
       <AccountButton />
-      <MapView
-        ref={mapRef}
+
+      {/* ─── Map Component (Cross Platform) ─────────────────────────── */}
+      <MapComponent
+        mapRef={mapRef}
         style={styles.map}
-        showsUserLocation={true}
-        provider={PROVIDER_DEFAULT}
         initialRegion={initialRegion}
-      >
-        {memorizedParques.map((parque, index) => {
-          const { latitude, longitude, column2, column3 } = parque
-          if (!isNaN(Number.parseFloat(String(latitude))) && !isNaN(Number.parseFloat(String(longitude)))) {
-            return (
-              <Marker
-                key={index}
-                coordinate={{
-                  latitude: Number.parseFloat(String(latitude)),
-                  longitude: Number.parseFloat(String(longitude)),
-                }}
-                title={column2}
-                description={column3}
-                onPress={() => handleMarkerPress(parque)}
-                pinColor={getMarkerColor(parque)}
-              />
-            )
-          }
-          return null
-        })}
-        {routeCoordinates.length > 0 && (selectedButton === "cercano" || selectedButton === "custom") && (
-          <Polyline coordinates={routeCoordinates} strokeWidth={4} strokeColor="blue" />
-        )}
-      </MapView>
-      <TouchableOpacity style={styles.tipButton} onPress={handleTipPress}>
+        parques={memorizedParques}
+        routeCoordinates={routeCoordinates}
+        selectedButton={selectedButton}
+        theme={theme}
+        handleMarkerPress={handleMarkerPress}
+        getMarkerColor={getMarkerColor}
+      />
+
+      {/* ─── Tip button ─────────────────────────────────────── */}
+      <TouchableOpacity style={styles.tipButton} onPress={handleTipPress} activeOpacity={0.8}>
         <Image source={require("../../../assets/tip-icon.jpg")} style={styles.tipIcon} />
       </TouchableOpacity>
-      <Animated.View style={[styles.drawer, { height: animation }]} {...panResponder.panHandlers}>
-        <TouchableOpacity onPress={toggleDrawer} style={styles.drawerHandle}>
+
+      {/* ─── Animated Drawer (Reanimated) ───────────────────── */}
+      <Animated.View style={[styles.drawer, drawerAnimatedStyle]}>
+        {/* Handle */}
+        <TouchableOpacity onPress={toggleDrawer} style={styles.drawerHandle} activeOpacity={0.7}>
           <View style={styles.handle} />
         </TouchableOpacity>
-        <Text style={styles.drawerTitle}>Parques</Text>
 
-        <View style={styles.buttonContainer}>
-          <Button
-            mode={selectedButton === "cercano" ? "contained" : "outlined"}
-            onPress={handleNearestParkPress}
-            icon="map-marker-radius"
-            textColor={selectedButton === "cercano" ? theme.colors.text : theme.colors.primary}
-            buttonColor={selectedButton === "cercano" ? theme.colors.primary : theme.colors.text}
-            style={styles.button}
-          >
-            Cercano
-          </Button>
-          <Button
-            mode={selectedButton === "optimo" ? "contained" : "outlined"}
-            onPress={handleOptimalParkPress}
-            icon="star"
-            textColor={selectedButton === "optimo" ? theme.colors.text : theme.colors.primary}
-            buttonColor={selectedButton === "optimo" ? theme.colors.primary : theme.colors.text}
-            style={styles.button}
-          >
-            Optimo
-          </Button>
-          <IconButton icon="information" size={24} onPress={() => setShowInfoModal(true)} />
+        {/* Drawer header */}
+        <View style={styles.drawerHeader}>
+          <Text style={styles.drawerTitle}>Parques Cercanos</Text>
+          <View style={styles.buttonRow}>
+            <TouchableOpacity
+              style={[styles.actionBtn, selectedButton === "cercano" && styles.actionBtnActive]}
+              onPress={handleNearestParkPress}
+              activeOpacity={0.8}
+            >
+              <MaterialIcons
+                name="place"
+                size={16}
+                color={selectedButton === "cercano" ? "#fff" : theme.colors.secondary}
+              />
+              <Text style={[styles.actionBtnText, selectedButton === "cercano" && styles.actionBtnTextActive]}>
+                Cercano
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.actionBtn, selectedButton === "optimo" && styles.actionBtnActive]}
+              onPress={handleOptimalParkPress}
+              activeOpacity={0.8}
+            >
+              <MaterialIcons
+                name="star"
+                size={16}
+                color={selectedButton === "optimo" ? "#fff" : theme.colors.secondary}
+              />
+              <Text style={[styles.actionBtnText, selectedButton === "optimo" && styles.actionBtnTextActive]}>
+                Óptimo
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.infoBtn}
+              onPress={() => setShowInfoModal(true)}
+              activeOpacity={0.7}
+            >
+              <MaterialIcons name="info-outline" size={20} color={theme.colors.secondary} />
+            </TouchableOpacity>
+          </View>
         </View>
 
-        {/* Search and Filter UI - Only visible when drawer is expanded */}
+        {/* Expanded content (search + filters) */}
         {isDrawerExpanded && (
-          <View style={styles.searchFilterContainer}>
+          <Animated.View style={[styles.searchFilterContainer, detailOpacity]}>
             <Searchbar
               placeholder="Buscar parque..."
               onChangeText={setSearchQuery}
               value={searchQuery}
               style={styles.searchBar}
-              icon={() => <MaterialIcons name="search" size={24} color={theme.colors.primary} />}
-              clearIcon={() => <MaterialIcons name="clear" size={24} color={theme.colors.primary} />}
+              inputStyle={styles.searchInput}
+              icon={() => <MaterialIcons name="search" size={20} color={theme.colors.secondary} />}
+              clearIcon={() => <MaterialIcons name="clear" size={20} color={theme.colors.secondary} />}
             />
-
-            {/* Sector filters */}
-            <Text style={styles.filterSectionTitle}>Sectores</Text>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.filtersScrollView}
-            >
+            <Text style={styles.filterLabel}>Sectores</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filtersRow}>
               {sectorOptions.map((sector) => (
-                <Chip
+                <TouchableOpacity
                   key={sector.id}
-                  selected={activeSectorFilter === sector.id}
                   onPress={() => toggleSectorFilter(sector.id)}
-                  style={[styles.sectorChip, activeSectorFilter === sector.id && { backgroundColor: sector.color }]}
-                  selectedColor={activeSectorFilter === sector.id ? "#fff" : undefined}
-                  mode={activeSectorFilter === sector.id ? "flat" : "outlined"}
+                  style={[
+                    styles.sectorPill,
+                    activeSectorFilter === sector.id && { backgroundColor: sector.color },
+                  ]}
+                  activeOpacity={0.8}
                 >
-                  {sector.label}
-                </Chip>
+                  <Text
+                    style={[
+                      styles.sectorPillText,
+                      activeSectorFilter === sector.id && styles.sectorPillTextActive,
+                    ]}
+                  >
+                    {sector.label}
+                  </Text>
+                </TouchableOpacity>
               ))}
             </ScrollView>
-
-            {/* Results count and clear filters */}
-            <View style={styles.resultsContainer}>
+            <View style={styles.resultsRow}>
               <Text style={styles.resultsCount}>
-                {filteredParks.length} {filteredParks.length === 1 ? "parque encontrado" : "parques encontrados"}
+                {filteredParks.length} {filteredParks.length === 1 ? "parque" : "parques"} encontrados
               </Text>
-
               {(activeSectorFilter || searchQuery) && (
-                <Chip
-                  onPress={clearFilters}
-                  style={styles.clearFilterChip}
-                  icon={() => <MaterialIcons name="refresh" size={18} color="#fff" />}
-                  textStyle={{ color: "#fff" }}
-                >
-                  Limpiar
-                </Chip>
+                <TouchableOpacity onPress={clearFilters} style={styles.clearBtn} activeOpacity={0.8}>
+                  <MaterialIcons name="refresh" size={14} color="#fff" />
+                  <Text style={styles.clearBtnText}>Limpiar</Text>
+                </TouchableOpacity>
               )}
             </View>
-          </View>
+          </Animated.View>
         )}
 
         <FlatList
-          data={isLoading ? Array(10).fill({}) : filteredParks.length > 0 ? filteredParks : memorizedParques}
+          data={isLoading ? Array(8).fill({}) : filteredParks.length > 0 ? filteredParks : memorizedParques}
           renderItem={renderParkItem}
-          keyExtractor={(item, index) => (item && item.id ? String(item.id) : `placeholder-${index}`)}
+          keyExtractor={(item, index) => (item?.id ? String(item.id) : `placeholder-${index}`)}
           contentContainerStyle={styles.parkList}
           initialNumToRender={10}
           maxToRenderPerBatch={10}
           windowSize={5}
+          showsVerticalScrollIndicator={false}
         />
       </Animated.View>
 
-      {/* Park Information Modal */}
+      {/* ─── Modals ──────────────────────────────────────────── */}
       <ParkInfoModal
         visible={showParkModal}
         park={selectedPark}
@@ -513,41 +442,42 @@ export default function SearchMaps() {
         onShowRoute={handleShowRoute}
       />
 
-      <Modal
-        animationType="slide"
-        transparent={true}
-        visible={showInfoModal}
-        onRequestClose={() => setShowInfoModal(false)}
-      >
-        <View style={styles.modalContainer}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Información</Text>
-            <Text>Aquí puedes encontrar información sobre los tipos de parques:</Text>
-            <Text>- Parque cercano: El parque más próximo a tu ubicación actual.</Text>
-            <Text>
-              - Parque óptimo: Un parque sugerido basado en tus preferencias y actividades populares (función aún no
-              implementada).
-            </Text>
-            <Button onPress={() => setShowInfoModal(false)}>Cerrar</Button>
+      <Modal animationType="slide" transparent={true} visible={showInfoModal} onRequestClose={() => setShowInfoModal(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalSheet}>
+            <View style={styles.modalHandle} />
+            <Text style={styles.modalTitle}>Tipos de búsqueda</Text>
+            <View style={styles.modalInfoRow}>
+              <MaterialIcons name="place" size={24} color={theme.colors.secondary} />
+              <Text style={styles.modalInfoText}>
+                <Text style={{ fontWeight: "bold" }}>Cercano:</Text> El parque más próximo a tu ubicación actual.
+              </Text>
+            </View>
+            <View style={styles.modalInfoRow}>
+              <MaterialIcons name="star" size={24} color={theme.colors.secondary} />
+              <Text style={styles.modalInfoText}>
+                <Text style={{ fontWeight: "bold" }}>Óptimo:</Text> Parque sugerido según preferencias (próximamente).
+              </Text>
+            </View>
+            <TouchableOpacity style={styles.modalCloseBtn} onPress={() => setShowInfoModal(false)} activeOpacity={0.8}>
+              <Text style={styles.modalCloseBtnText}>Entendido</Text>
+            </TouchableOpacity>
           </View>
         </View>
       </Modal>
 
-      <Modal
-        animationType="slide"
-        transparent={true}
-        visible={showTipModal}
-        onRequestClose={() => setShowTipModal(false)}
-      >
-        <View style={styles.tipModalContainer}>
-          <Card style={styles.tipModalContent}>
-            <Card.Content>
-              <Text style={styles.tipText}>{currentTip}</Text>
-            </Card.Content>
-            <Card.Actions>
-              <Button onPress={() => setShowTipModal(false)}>Cerrar</Button>
-            </Card.Actions>
-          </Card>
+      <Modal animationType="fade" transparent={true} visible={showTipModal} onRequestClose={() => setShowTipModal(false)}>
+        <View style={styles.tipModalOverlay}>
+          <View style={styles.tipModalCard}>
+            <View style={styles.tipModalHeader}>
+              <Image source={require("../../../assets/tip-icon.jpg")} style={styles.tipModalIcon} />
+              <Text style={styles.tipModalTitle}>Consejo del día</Text>
+            </View>
+            <Text style={styles.tipText}>{currentTip}</Text>
+            <TouchableOpacity style={styles.modalCloseBtn} onPress={() => setShowTipModal(false)} activeOpacity={0.8}>
+              <Text style={styles.modalCloseBtnText}>¡Entendido!</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </Modal>
     </View>
@@ -555,194 +485,174 @@ export default function SearchMaps() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
+  container: { flex: 1, backgroundColor: theme.colors.background },
+  loadingContainer: { flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: theme.colors.background, gap: 16 },
+  loadingText: { color: theme.colors.textMuted, fontSize: theme.fontSizes.base },
+  map: { width: "100%", height: "100%", zIndex: 0 },
+  // Web map placeholder
+  webMapPlaceholder: {
+    backgroundColor: "#e8f5e9",
+    justifyContent: "center",
     alignItems: "center",
+    gap: 12,
+    paddingHorizontal: 40,
   },
-  map: {
-    width: "100%",
-    height: "100%",
-    zIndex: 0,
+  webMapIcon: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    backgroundColor: "#fff",
+    justifyContent: "center",
+    alignItems: "center",
+    ...theme.shadow.md,
   },
+  webMapTitle: { fontSize: theme.fontSizes.xl, fontWeight: "bold", color: theme.colors.primary, textAlign: "center", marginTop: 8 },
+  webMapSubtitle: { fontSize: theme.fontSizes.base, color: theme.colors.textMuted, textAlign: "center" },
+  webMapHint: { fontSize: theme.fontSizes.sm, color: theme.colors.secondary, textAlign: "center", fontWeight: "500" },
+  // Tip button
+  tipButton: {
+    position: "absolute",
+    bottom: 180,
+    right: 16,
+    backgroundColor: "#fff",
+    borderRadius: 30,
+    padding: 10,
+    zIndex: 5,
+    ...theme.shadow.md,
+  },
+  tipIcon: { width: 40, height: 40, borderRadius: 20 },
+  // Drawer
   drawer: {
     position: "absolute",
     bottom: 0,
     left: 0,
     right: 0,
     backgroundColor: "#fff",
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    padding: 20,
-    elevation: 10,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: -2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: 20,
+    paddingBottom: 10,
     zIndex: 9,
+    ...theme.shadow.lg,
   },
-  drawerHandle: {
-    alignItems: "center",
-    marginBottom: 10,
-  },
-  handle: {
-    width: 40,
-    height: 5,
-    backgroundColor: "#ccc",
-    borderRadius: 3,
-  },
-  drawerTitle: {
-    fontSize: 18,
-    fontWeight: "bold",
-    marginBottom: 10,
-  },
-  buttonContainer: {
+  drawerHandle: { alignItems: "center", paddingVertical: 10 },
+  handle: { width: 36, height: 4, backgroundColor: "#d0d0d0", borderRadius: 2 },
+  drawerHeader: { marginBottom: 10 },
+  drawerTitle: { fontSize: theme.fontSizes.lg, fontWeight: "700", color: theme.colors.primary, marginBottom: 10 },
+  buttonRow: { flexDirection: "row", alignItems: "center", gap: 8 },
+  actionBtn: {
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 10,
+    gap: 4,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1.5,
+    borderColor: theme.colors.secondary,
+    backgroundColor: "#fff",
   },
-  button: {
-    flex: 1,
-    marginHorizontal: 5,
+  actionBtnActive: { backgroundColor: theme.colors.secondary, borderColor: theme.colors.secondary },
+  actionBtnText: { fontSize: theme.fontSizes.sm, color: theme.colors.secondary, fontWeight: "600" },
+  actionBtnTextActive: { color: "#fff" },
+  infoBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    borderWidth: 1.5,
+    borderColor: theme.colors.secondary,
+    justifyContent: "center",
+    alignItems: "center",
+    marginLeft: "auto",
   },
-  searchFilterContainer: {
-    marginBottom: 15,
-  },
+  // Search & filters
+  searchFilterContainer: { marginBottom: 10 },
   searchBar: {
-    marginBottom: 10,
+    marginBottom: 8,
     elevation: 0,
-    backgroundColor: "#f5f5f5",
-    borderRadius: 10,
+    backgroundColor: "#f0f5ec",
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
   },
-  filterSectionTitle: {
-    fontSize: 14,
-    fontWeight: "500",
-    marginTop: 5,
-    marginBottom: 5,
-    color: "#666",
+  searchInput: { fontSize: theme.fontSizes.sm },
+  filterLabel: { fontSize: theme.fontSizes.xs, fontWeight: "600", color: theme.colors.textMuted, marginBottom: 8, textTransform: "uppercase", letterSpacing: 0.5 },
+  filtersRow: { paddingBottom: 6, gap: 8 },
+  sectorPill: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    borderWidth: 1.5,
+    borderColor: "#ccc",
+    backgroundColor: "#fff",
   },
-  filtersScrollView: {
-    paddingVertical: 5,
-  },
-  sectorChip: {
-    marginRight: 8,
-    marginBottom: 5,
-  },
-  clearFilterChip: {
-    marginRight: 8,
-    marginBottom: 5,
-    backgroundColor: theme.colors.error,
-  },
-  resultsContainer: {
+  sectorPillText: { fontSize: theme.fontSizes.xs, color: "#555", fontWeight: "500" },
+  sectorPillTextActive: { color: "#fff", fontWeight: "700" },
+  resultsRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: 6 },
+  resultsCount: { fontSize: theme.fontSizes.xs, color: theme.colors.textMuted },
+  clearBtn: {
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
-    marginTop: 5,
+    gap: 4,
+    backgroundColor: theme.colors.error,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
   },
-  resultsCount: {
-    fontSize: 12,
-    color: "#666",
-    marginBottom: 5,
-  },
-  parkList: {
-    paddingBottom: 20,
-  },
+  clearBtnText: { color: "#fff", fontSize: theme.fontSizes.xs, fontWeight: "600" },
+  // Park list
+  parkList: { paddingBottom: 24 },
   parkItem: {
     flexDirection: "row",
     alignItems: "center",
-    paddingVertical: 10,
+    paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: "#eee",
+    borderBottomColor: "#f0f0f0",
   },
-  parkIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: "#E8F5E9",
+  parkIconBadge: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: "#e8f5e9",
     justifyContent: "center",
     alignItems: "center",
-    marginRight: 10,
+    marginRight: 12,
   },
-  parkInfo: {
-    flex: 1,
+  parkInfo: { flex: 1 },
+  parkName: { fontSize: theme.fontSizes.base, fontWeight: "700", color: theme.colors.textDark },
+  parkDescription: { fontSize: theme.fontSizes.sm, color: theme.colors.textMuted, marginTop: 2 },
+  // Modals
+  modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "flex-end" },
+  modalSheet: {
+    backgroundColor: "#fff",
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: 24,
+    paddingBottom: 40,
   },
-  parkName: {
-    fontSize: 16,
-    fontWeight: "bold",
-  },
-  parkDistance: {
-    fontSize: 14,
-    color: "#666",
-  },
-  skeletonItem: {
-    flexDirection: "row",
+  modalHandle: { width: 36, height: 4, backgroundColor: "#d0d0d0", borderRadius: 2, alignSelf: "center", marginBottom: 20 },
+  modalTitle: { fontSize: theme.fontSizes.lg, fontWeight: "700", color: theme.colors.primary, marginBottom: 20 },
+  modalInfoRow: { flexDirection: "row", alignItems: "flex-start", gap: 12, marginBottom: 16 },
+  modalInfoText: { flex: 1, fontSize: theme.fontSizes.base, color: "#333", lineHeight: 22 },
+  modalCloseBtn: {
+    backgroundColor: theme.colors.primary,
+    borderRadius: 14,
+    paddingVertical: 14,
     alignItems: "center",
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: "#eee",
+    marginTop: 20,
   },
-  skeletonIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: "#E0E0E0",
-    marginRight: 10,
+  modalCloseBtnText: { color: "#fff", fontWeight: "700", fontSize: theme.fontSizes.base },
+  // Tip modal
+  tipModalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "center", alignItems: "center", padding: 24 },
+  tipModalCard: {
+    backgroundColor: "#fff",
+    borderRadius: 24,
+    padding: 24,
+    width: "100%",
+    maxWidth: 380,
+    ...theme.shadow.lg,
   },
-  skeletonInfo: {
-    flex: 1,
-  },
-  skeletonText: {
-    height: 16,
-    backgroundColor: "#E0E0E0",
-    marginBottom: 5,
-    borderRadius: 4,
-  },
-  modalContainer: {
-    flex: 1,
-    justifyContent: "flex-end",
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
-  },
-  modalContent: {
-    backgroundColor: "white",
-    padding: 20,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: "bold",
-    marginBottom: 10,
-  },
-  tipButton: {
-    position: "absolute",
-    bottom: 160,
-    right: 10,
-    backgroundColor: "white",
-    borderRadius: 30,
-    padding: 10,
-    elevation: 5,
-    zIndex: 2,
-  },
-  tipIcon: {
-    width: 40,
-    height: 40,
-  },
-  tipModalContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
-  },
-  tipModalContent: {
-    width: "80%",
-    padding: 20,
-  },
-  tipText: {
-    fontSize: 16,
-    marginBottom: 10,
-  },
-  parkDescription: {
-    fontSize: 14,
-    color: "#666",
-  },
+  tipModalHeader: { flexDirection: "row", alignItems: "center", gap: 12, marginBottom: 16 },
+  tipModalIcon: { width: 44, height: 44, borderRadius: 22 },
+  tipModalTitle: { fontSize: theme.fontSizes.lg, fontWeight: "700", color: theme.colors.primary },
+  tipText: { fontSize: theme.fontSizes.base, color: "#444", lineHeight: 24 },
 })

@@ -1,0 +1,6 @@
+﻿src/app/_layout.tsx(2,40): error TS2307: Cannot find module './auth/AuthenticationContext' or its corresponding type declarations.
+src/features/auth/components/AccountButton.tsx(2,33): error TS2307: Cannot find module './userModalDisplayContext' or its corresponding type declarations.
+src/features/auth/components/userModal.tsx(13,33): error TS2307: Cannot find module './userModalDisplayContext' or its corresponding type declarations.
+src/features/routines/components/RutineItem.tsx(6,33): error TS2307: Cannot find module './userModalDisplayContext' or its corresponding type declarations.
+src/shared/components/TabsBar.tsx(5,35): error TS2307: Cannot find module './userModalDisplayContext' or its corresponding type declarations.
+src/shared/utils/functions.ts(3,74): error TS2307: Cannot find module './constants' or its corresponding type declarations.

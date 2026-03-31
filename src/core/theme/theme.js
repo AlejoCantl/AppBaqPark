@@ -1,0 +1,66 @@
+const theme = {
+  colors: {
+    primary: '#022601',
+    primaryLight: '#0a4a08',
+    secondary: '#5B8C11',
+    tertiary: '#C1D96C',
+    text: '#ffffff',
+    textDark: '#1a1a1a',
+    textMuted: '#666666',
+    background: '#F4F9F0',
+    card: '#ffffff',
+    border: '#e0e8d8',
+    success: '#4CAF50',
+    error: '#d32f2f',
+    warning: '#FF9800',
+    overlay: 'rgba(2, 38, 1, 0.7)',
+  },
+  fontSizes: {
+    xs: 12,
+    sm: 14,
+    base: 16,
+    lg: 18,
+    xl: 20,
+    xxl: 24,
+    xxxl: 32,
+  },
+  spacing: {
+    xs: 4,
+    small: 8,
+    medium: 16,
+    large: 24,
+    xl: 32,
+    xxl: 48,
+  },
+  radius: {
+    sm: 8,
+    md: 12,
+    lg: 20,
+    full: 100,
+  },
+  shadow: {
+    sm: {
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.08,
+      shadowRadius: 3,
+      elevation: 2,
+    },
+    md: {
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 3 },
+      shadowOpacity: 0.12,
+      shadowRadius: 6,
+      elevation: 4,
+    },
+    lg: {
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 6 },
+      shadowOpacity: 0.16,
+      shadowRadius: 12,
+      elevation: 8,
+    },
+  },
+};
+
+export default theme;
