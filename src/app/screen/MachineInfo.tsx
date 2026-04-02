@@ -8,8 +8,8 @@ import {
   TouchableOpacity,
   Animated,
   Dimensions,
-  SafeAreaView,
 } from "react-native"
+import { SafeAreaView } from "react-native-safe-area-context"
 import { Ionicons } from "@expo/vector-icons"
 import AccountButton from '@/features/auth/components/AccountButton'
 import theme from '@/core/theme/theme'

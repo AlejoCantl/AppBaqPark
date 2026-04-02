@@ -1,10 +1,12 @@
 {
   "expo": {
-    "scheme": "acme",
+    "name": "AppBaqPark",
+    "slug": "AppBaqPark",
+    "scheme": "com.appbaqpark",
     "userInterfaceStyle": "automatic",
     "orientation": "default",
     "web": {
-      "output": "single",
+      "output": "static",
       "bundler": "metro"
     },
     "plugins": [
@@ -15,16 +17,19 @@
         }
       ]
     ],
-    "name": "AppBaqPark",
-    "slug": "AppBaqPark",
     "android": {
       "package": "com.appbaqpark"
-  },
+    },
     "extra": {
       "eas": {
-        "projectId": "bd34d188-c154-409b-8314-797e6d2ee458"
+        "projectId": "bd34d188-c154-409b-8314-797e6d2ee458",
+        "secrets": {
+          "GOOGLE_MAPS_API_KEY": true,
+          "PARKS_KEY": true,
+          "SUPABASE_URL": true,
+          "SUPABASE_ANON_KEY": true
+        }
       }
     }
   }
 }
-

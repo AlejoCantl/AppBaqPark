@@ -1,114 +1,142 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { Tabs } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-import { StyleSheet, View, Text, Platform } from "react-native";
-import { UserModalProvider } from "@/features/auth/context/userModalDisplayContext";
+import { View, TouchableOpacity, Platform, StyleSheet } from "react-native";
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withSpring,
+  withDelay,
+  withTiming,
+} from "react-native-reanimated";
 import theme from '@/core/theme/theme';
+import { TAB_BAR_HEIGHT, TAB_BAR_BOTTOM_ANDROID, TAB_BAR_BOTTOM_IOS } from '@/core/constants/constants';
 
-function TabBarIcon({ focused, name, label }) {
+const TAB_BAR_BOTTOM = Platform.OS === "ios" ? TAB_BAR_BOTTOM_IOS : TAB_BAR_BOTTOM_ANDROID;
+
+// ─── Mapa de íconos por nombre de ruta ───────────────────────────────────────
+const ROUTE_ICONS: Record<string, { active: string; inactive: string }> = {
+  SearchMaps: { active: "earth", inactive: "earth-outline" },
+  Rutines:    { active: "barbell", inactive: "barbell-outline" },
+  MachineInfo:{ active: "bicycle", inactive: "bicycle-outline" },
+  Settings:   { active: "settings", inactive: "settings-outline" },
+};
+
+// ─── Barra flotante animada completamente personalizada ────────────────────────
+function CustomTabBar({ state, navigation }: any) {
+  const translateY = useSharedValue(TAB_BAR_HEIGHT + TAB_BAR_BOTTOM + 20);
+  const opacity = useSharedValue(0);
+
+  useEffect(() => {
+    // Animación de entrada: slide desde abajo + fade in
+    translateY.value = withDelay(300, withSpring(0, { damping: 18, stiffness: 110 }));
+    opacity.value = withDelay(300, withTiming(1, { duration: 500 }));
+  }, []);
+
+  const animStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: translateY.value }],
+    opacity: opacity.value,
+  }));
+
   return (
-    <View style={styles.iconContainer}>
-      <View style={[styles.iconWrapper, focused && styles.iconWrapperActive]}>
-        <Ionicons name={name} size={24} color={focused ? "#fff" : theme.colors.textMuted} />
-      </View>
-      <Text style={[styles.iconLabel, focused && styles.iconLabelActive]}>
-        {label}
-      </Text>
-    </View>
+    <Animated.View style={[styles.floatingBar, animStyle]}>
+      {state.routes.map((route: any, index: number) => {
+        const focused = state.index === index;
+        const icons = ROUTE_ICONS[route.name] ?? { active: "help-circle", inactive: "help-circle-outline" };
+
+        const onPress = () => {
+          const event = navigation.emit({
+            type: "tabPress",
+            target: route.key,
+            canPreventDefault: true,
+          });
+          if (!focused && !event.defaultPrevented) {
+            navigation.navigate({ name: route.name, merge: true });
+          }
+        };
+
+        return (
+          <TouchableOpacity
+            key={route.key}
+            onPress={onPress}
+            style={styles.tabTouchable}
+            activeOpacity={0.75}
+          >
+            <View style={[styles.iconPill, focused && styles.iconPillActive]}>
+              <Ionicons
+                name={(focused ? icons.active : icons.inactive) as any}
+                size={22}
+                color={focused ? "#fff" : theme.colors.textMuted}
+              />
+            </View>
+          </TouchableOpacity>
+        );
+      })}
+    </Animated.View>
   );
 }
 
 export default function TabsBar() {
   return (
-    <UserModalProvider>
-      <Tabs
-        detachInactiveScreens={true}
-        initialRouteName="SearchMaps"
-        backBehavior="initialRoute"
-        screenOptions={{
-          headerShown: false,
-          tabBarShowLabel: false,
-          tabBarStyle: styles.tabBar,
-        }}
-      >
-        <Tabs.Screen
-          name="SearchMaps"
-          options={{
-            title: "Parques",
-            tabBarIcon: ({ focused }) => (
-              <TabBarIcon focused={focused} name={focused ? "earth" : "earth-outline"} label="Mapa" />
-            ),
-          }}
-        />
-        <Tabs.Screen
-          name="Rutines"
-          options={{
-            title: "Rutinas",
-            tabBarIcon: ({ focused }) => (
-              <TabBarIcon focused={focused} name={focused ? "barbell" : "barbell-outline"} label="Rutinas" />
-            ),
-          }}
-        />
-        <Tabs.Screen
-          name="MachineInfo"
-          options={{
-            title: "Máquinas",
-            tabBarIcon: ({ focused }) => (
-              <TabBarIcon focused={focused} name={focused ? "bicycle" : "bicycle-outline"} label="Máquinas" />
-            ),
-          }}
-        />
-        <Tabs.Screen
-          name="Settings"
-          options={{
-            title: "Ajustes",
-            tabBarIcon: ({ focused }) => (
-              <TabBarIcon focused={focused} name={focused ? "settings" : "settings-outline"} label="Ajustes" />
-            ),
-          }}
-        />
-      </Tabs>
-    </UserModalProvider>
+    <Tabs
+      detachInactiveScreens={false}
+      initialRouteName="SearchMaps"
+      backBehavior="initialRoute"
+      tabBar={(props) => <CustomTabBar {...props} />}
+      screenOptions={{ headerShown: false }}
+    >
+      <Tabs.Screen name="SearchMaps" options={{ title: "Parques" }} />
+      <Tabs.Screen name="Rutines"    options={{ title: "Rutinas" }} />
+      <Tabs.Screen name="MachineInfo" options={{ title: "Máquinas" }} />
+      <Tabs.Screen name="Settings"  options={{ title: "Ajustes" }} />
+    </Tabs>
   );
 }
 
 const styles = StyleSheet.create({
-  tabBar: {
-    backgroundColor: theme.colors.card,
-    borderTopWidth: 1,
-    borderTopColor: theme.colors.border,
-    height: Platform.OS === "ios" ? 85 : 70,
-    paddingBottom: Platform.OS === "ios" ? 20 : 10,
-    paddingTop: 10,
-    elevation: 8,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: -2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
+  floatingBar: {
+    position: 'absolute',
+    bottom: TAB_BAR_BOTTOM,
+    left: 16,
+    right: 16,
+    height: TAB_BAR_HEIGHT,
+    backgroundColor: "#fff",
+    borderRadius: 30,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-around',
+    zIndex: 10,
+    // Sombra con tinte verde de la paleta de la app
+    elevation: 16,
+    shadowColor: theme.colors.primary,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.22,
+    shadowRadius: 18,
+    // Borde dinámico con color de la paleta (verde claro, semi-transparente)
+    borderWidth: 1.5,
+    borderColor: `${theme.colors.secondary}40`,
   },
-  iconContainer: {
-    alignItems: "center",
-    justifyContent: "center",
+  tabTouchable: {
+    flex: 1,
+    height: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  iconWrapper: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "transparent",
+  iconPill: {
+    width: 48,
+    height: 36,
+    borderRadius: 18,
+    overflow: 'hidden',        // garantiza que el bg se recorte con borderRadius en Android
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'transparent',
   },
-  iconWrapperActive: {
-    backgroundColor: theme.colors.secondary,
-  },
-  iconLabel: {
-    fontSize: 10,
-    marginTop: 4,
-    color: theme.colors.textMuted,
-    fontWeight: "500",
-  },
-  iconLabelActive: {
-    color: theme.colors.secondary,
-    fontWeight: "700",
+  iconPillActive: {
+    backgroundColor: theme.colors.primary,
+    shadowColor: theme.colors.primary,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.5,
+    shadowRadius: 8,
+    elevation: 6,
   },
 });

@@ -17,7 +17,9 @@ import Animated, {
   withSpring,
   interpolate,
   Extrapolation,
+  runOnJS,
 } from "react-native-reanimated"
+import { GestureDetector, Gesture } from 'react-native-gesture-handler'
 import MapComponent from '@/features/maps/components/MapComponent'
 import { StatusBar } from "expo-status-bar"
 import { ActivityIndicator, MD2Colors, Button, IconButton, Chip, Searchbar } from "react-native-paper"
@@ -76,6 +78,7 @@ export default function SearchMaps() {
   const [isDrawerExpanded, setIsDrawerExpanded] = useState(false)
   const [activeSectorFilter, setActiveSectorFilter] = useState<string | null>(null)
   const mapRef = useRef(null)
+  const parquesLoadedRef = useRef(false)
 
   // ─── Drawer animation via Reanimated (replaces PanResponder) ─────────────────
   const drawerHeight = useSharedValue(DRAWER_MIN_HEIGHT)
@@ -106,6 +109,34 @@ export default function SearchMaps() {
     setIsDrawerExpanded(false)
     drawerHeight.value = withSpring(DRAWER_MIN_HEIGHT, { damping: 22, stiffness: 180 })
   }, [])
+
+  const ctxStartY = useSharedValue(0)
+
+  const panGesture = Gesture.Pan()
+    // Sólo activa el gesto en eje Y para no bloquear el ScrollView horizontal de sectores
+    .activeOffsetY([-12, 12])
+    .failOffsetX([-12, 12])
+    .onStart(() => {
+      ctxStartY.value = drawerHeight.value
+      runOnJS(setIsDrawerExpanded)(true)
+    })
+    .onUpdate((event) => {
+      const newHeight = ctxStartY.value - event.translationY
+      drawerHeight.value = Math.max(DRAWER_MIN_HEIGHT, Math.min(newHeight, DRAWER_MAX_HEIGHT + 50))
+    })
+    .onEnd((event) => {
+      if (event.translationY < -50 || event.velocityY < -500) {
+        drawerHeight.value = withSpring(DRAWER_MAX_HEIGHT, { damping: 22, stiffness: 180 })
+        runOnJS(setIsDrawerExpanded)(true)
+      } else if (event.translationY > 50 || event.velocityY > 500) {
+        drawerHeight.value = withSpring(DRAWER_MIN_HEIGHT, { damping: 22, stiffness: 180 })
+        runOnJS(setIsDrawerExpanded)(false)
+      } else {
+        const snapToMax = drawerHeight.value > (DRAWER_MAX_HEIGHT + DRAWER_MIN_HEIGHT) / 2
+        drawerHeight.value = withSpring(snapToMax ? DRAWER_MAX_HEIGHT : DRAWER_MIN_HEIGHT, { damping: 22, stiffness: 180 })
+        runOnJS(setIsDrawerExpanded)(snapToMax)
+      }
+    })
 
   const handlGetParques = useCallback(() => {
     operationGetParques(setParques)
@@ -154,14 +185,21 @@ export default function SearchMaps() {
 
   const decodePolyline = useCallback(operationPoints, [])
 
+  // Carga parques y ubicación una única vez en el mount del componente.
+  // detachInactiveScreens=false garantiza que este efecto no corre de nuevo al navegar.
   useEffect(() => {
-    if (!location) {
-      operationRequestLocation(setErrorMsg, setLocation, setIsLoading)
+    // Siempre solicitar ubicación (puede estar desactuali­za)
+    operationRequestLocation(setErrorMsg, setLocation, setIsLoading)
+
+    // Cargar parques sólo si aún no se han cargado
+    if (!parquesLoadedRef.current) {
+      parquesLoadedRef.current = true
+      operationGetParques((data) => {
+        setParques(data ?? [])
+        setIsLoading(false)   // garantiza que el spinner pare aunque la ubicación tarde
+      })
     }
-    if (parques.length === 0) {
-      handlGetParques()
-    }
-  }, [location, parques, handlGetParques])
+  }, [])  // eslint-disable-line react-hooks/exhaustive-deps
 
   const centerMapOnPark = useCallback(
     (park: Park) => {
@@ -323,59 +361,59 @@ export default function SearchMaps() {
       </TouchableOpacity>
 
       {/* ─── Animated Drawer (Reanimated) ───────────────────── */}
-      <Animated.View style={[styles.drawer, drawerAnimatedStyle]}>
-        {/* Handle */}
-        <TouchableOpacity onPress={toggleDrawer} style={styles.drawerHandle} activeOpacity={0.7}>
-          <View style={styles.handle} />
-        </TouchableOpacity>
+      <GestureDetector gesture={panGesture}>
+        <Animated.View style={[styles.drawer, drawerAnimatedStyle]}>
+          {/* Handle */}
+          <TouchableOpacity onPress={toggleDrawer} style={styles.drawerHandle} activeOpacity={0.7}>
+            <View style={styles.handle} />
+          </TouchableOpacity>
 
-        {/* Drawer header */}
-        <View style={styles.drawerHeader}>
-          <Text style={styles.drawerTitle}>Parques Cercanos</Text>
-          <View style={styles.buttonRow}>
-            <TouchableOpacity
-              style={[styles.actionBtn, selectedButton === "cercano" && styles.actionBtnActive]}
-              onPress={handleNearestParkPress}
-              activeOpacity={0.8}
-            >
-              <MaterialIcons
-                name="place"
-                size={16}
-                color={selectedButton === "cercano" ? "#fff" : theme.colors.secondary}
-              />
-              <Text style={[styles.actionBtnText, selectedButton === "cercano" && styles.actionBtnTextActive]}>
-                Cercano
-              </Text>
-            </TouchableOpacity>
+          {/* Drawer header */}
+          <View style={styles.drawerHeader}>
+            <Text style={styles.drawerTitle}>Parques Cercanos</Text>
+            <View style={styles.buttonRow}>
+              <TouchableOpacity
+                style={[styles.actionBtn, selectedButton === "cercano" && styles.actionBtnActive]}
+                onPress={handleNearestParkPress}
+                activeOpacity={0.8}
+              >
+                <MaterialIcons
+                  name="place"
+                  size={16}
+                  color={selectedButton === "cercano" ? "#fff" : theme.colors.secondary}
+                />
+                <Text style={[styles.actionBtnText, selectedButton === "cercano" && styles.actionBtnTextActive]}>
+                  Cercano
+                </Text>
+              </TouchableOpacity>
 
-            <TouchableOpacity
-              style={[styles.actionBtn, selectedButton === "optimo" && styles.actionBtnActive]}
-              onPress={handleOptimalParkPress}
-              activeOpacity={0.8}
-            >
-              <MaterialIcons
-                name="star"
-                size={16}
-                color={selectedButton === "optimo" ? "#fff" : theme.colors.secondary}
-              />
-              <Text style={[styles.actionBtnText, selectedButton === "optimo" && styles.actionBtnTextActive]}>
-                Óptimo
-              </Text>
-            </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.actionBtn, selectedButton === "optimo" && styles.actionBtnActive]}
+                onPress={handleOptimalParkPress}
+                activeOpacity={0.8}
+              >
+                <MaterialIcons
+                  name="star"
+                  size={16}
+                  color={selectedButton === "optimo" ? "#fff" : theme.colors.secondary}
+                />
+                <Text style={[styles.actionBtnText, selectedButton === "optimo" && styles.actionBtnTextActive]}>
+                  Óptimo
+                </Text>
+              </TouchableOpacity>
 
-            <TouchableOpacity
-              style={styles.infoBtn}
-              onPress={() => setShowInfoModal(true)}
-              activeOpacity={0.7}
-            >
-              <MaterialIcons name="info-outline" size={20} color={theme.colors.secondary} />
-            </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.infoBtn}
+                onPress={() => setShowInfoModal(true)}
+                activeOpacity={0.7}
+              >
+                <MaterialIcons name="info-outline" size={20} color={theme.colors.secondary} />
+              </TouchableOpacity>
+            </View>
           </View>
-        </View>
 
-        {/* Expanded content (search + filters) */}
-        {isDrawerExpanded && (
-          <Animated.View style={[styles.searchFilterContainer, detailOpacity]}>
+          {/* Expanded content (search + filters) */}
+          <Animated.View style={[styles.searchFilterContainer, detailOpacity, !isDrawerExpanded && { display: 'none' }]}>
             <Searchbar
               placeholder="Buscar parque..."
               onChangeText={setSearchQuery}
@@ -420,7 +458,6 @@ export default function SearchMaps() {
               )}
             </View>
           </Animated.View>
-        )}
 
         <FlatList
           data={isLoading ? Array(8).fill({}) : filteredParks.length > 0 ? filteredParks : memorizedParques}
@@ -432,7 +469,8 @@ export default function SearchMaps() {
           windowSize={5}
           showsVerticalScrollIndicator={false}
         />
-      </Animated.View>
+        </Animated.View>
+      </GestureDetector>
 
       {/* ─── Modals ──────────────────────────────────────────── */}
       <ParkInfoModal
@@ -512,7 +550,8 @@ const styles = StyleSheet.create({
   // Tip button
   tipButton: {
     position: "absolute",
-    bottom: 180,
+    // Queda sobre el drawer en estado colapsado (DRAWER_MIN_HEIGHT + 16)
+    bottom: DRAWER_MIN_HEIGHT + 16,
     right: 16,
     backgroundColor: "#fff",
     borderRadius: 30,
@@ -524,6 +563,8 @@ const styles = StyleSheet.create({
   // Drawer
   drawer: {
     position: "absolute",
+    // bottom: 0 — queda debajo del TabBar flotante (zIndex: 10)
+    // El contenido visible asoma por encima gracias a DRAWER_MIN_HEIGHT >= 190
     bottom: 0,
     left: 0,
     right: 0,

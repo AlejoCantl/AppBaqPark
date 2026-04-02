@@ -1,11 +1,13 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, Image, TouchableOpacity, SafeAreaView, Dimensions } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Dimensions, Platform } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
   withSpring,
   interpolate,
   Extrapolation,
+  runOnJS,
 } from 'react-native-reanimated';
 import { GestureDetector, Gesture } from 'react-native-gesture-handler';
 import AccountButton from '@/features/auth/components/AccountButton';
@@ -14,6 +16,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useModalContext } from '@/features/auth/context/userModalDisplayContext';
 import RutineItem from '@/features/routines/components/RutineItem';
 import theme from '@/core/theme/theme';
+import { TAB_BAR_HEIGHT, TAB_BAR_BOTTOM_ANDROID, TAB_BAR_BOTTOM_IOS } from '@/core/constants/constants';
 
 const routineTypes = [
   { title: 'Rutinas Básicas', image: require('../../../assets/basic.png') },
@@ -47,21 +50,46 @@ export default function Rutines() {
     });
   };
 
+  // ── Auto-colapsar el drawer cuando se cierra la sesión ───────────────────
+  useEffect(() => {
+    if (!session) {
+      setExpanded(false);
+      drawerHeight.value = withSpring(COLLAPSED_HEIGHT, { damping: 20, stiffness: 150 });
+    }
+  }, [session]);
+
   const panGesture = Gesture.Pan()
+    .activeOffsetY([-10, 10])
     .onStart(() => {
       ctxStartY.value = drawerHeight.value;
     })
     .onUpdate((event) => {
+      if (!session) return;  // sin sesión no arrastramos
       const newHeight = ctxStartY.value - event.translationY;
       drawerHeight.value = Math.max(COLLAPSED_HEIGHT, Math.min(newHeight, EXPANDED_HEIGHT + 50));
     })
     .onEnd((event) => {
+      if (!session) {
+        // Arrastre hacia arriba → abrir modal de login
+        if (event.translationY < -30 || event.velocityY < -300) {
+          runOnJS(open)();
+        }
+        return;
+      }
+      // Sesión activa: expandir o colapsar según dirección
       if (event.translationY < -50 || event.velocityY < -500) {
         drawerHeight.value = withSpring(EXPANDED_HEIGHT, { damping: 20, stiffness: 150 });
+        runOnJS(setExpanded)(true);
       } else if (event.translationY > 50 || event.velocityY > 500) {
         drawerHeight.value = withSpring(COLLAPSED_HEIGHT, { damping: 20, stiffness: 150 });
+        runOnJS(setExpanded)(false);
       } else {
-        drawerHeight.value = withSpring(drawerHeight.value > (EXPANDED_HEIGHT + COLLAPSED_HEIGHT) / 2 ? EXPANDED_HEIGHT : COLLAPSED_HEIGHT, { damping: 20, stiffness: 150 });
+        const snapToMax = drawerHeight.value > (EXPANDED_HEIGHT + COLLAPSED_HEIGHT) / 2;
+        drawerHeight.value = withSpring(
+          snapToMax ? EXPANDED_HEIGHT : COLLAPSED_HEIGHT,
+          { damping: 20, stiffness: 150 }
+        );
+        runOnJS(setExpanded)(snapToMax);
       }
     });
 
@@ -95,7 +123,8 @@ export default function Rutines() {
         ))}
       </View>
 
-      <GestureDetector gesture={session ? panGesture : Gesture.Pan().enabled(false)}>
+      {/* Gesto siempre activo: sin sesión dispara login al arrastrar arriba */}
+      <GestureDetector gesture={panGesture}>
         <Animated.View style={[styles.progressContainer, animatedDrawerStyle]}>
           <TouchableOpacity onPress={toggleDrawer} style={{ width: '100%' }} activeOpacity={0.8}>
             <View style={styles.handle} />
@@ -180,7 +209,9 @@ const styles = StyleSheet.create({
   },
   progressContainer: {
     position: 'absolute',
-    bottom: 0,
+    bottom: Platform.OS === 'ios'
+      ? TAB_BAR_BOTTOM_IOS + TAB_BAR_HEIGHT
+      : TAB_BAR_BOTTOM_ANDROID + TAB_BAR_HEIGHT,
     left: 0,
     right: 0,
     backgroundColor: theme.colors.primary,
