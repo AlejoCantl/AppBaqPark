@@ -1,7 +1,8 @@
 import React from "react";
 import { View, Text, Switch, StyleSheet } from "react-native";
 import ButtonsSettings from "./ButtonsSettings";
-import theme from '@/core/theme/theme';
+import { useAppTheme } from '@/core/theme/ThemeProvider';
+import theme from '@/core/theme/theme'; // used for static constants like radius
 
 export default function OptionsSettings({
   isEnabled,
@@ -9,67 +10,58 @@ export default function OptionsSettings({
   toggleDarkMode,
   toggleSwitch,
 }) {
+  const { colors } = useAppTheme();
+
   return (
     <View style={styles.container}>
-      <View style={styles.card}>
+      <View style={[styles.card, { backgroundColor: colors.card }]}>
         <View style={styles.setting}>
-          <Text style={styles.subTitle}>Notificaciones</Text>
+          <Text style={[styles.subTitle, { color: colors.textDark }]}>Notificaciones</Text>
           <Switch
-            trackColor={{ false: theme.colors.border, true: theme.colors.secondary }}
+            trackColor={{ false: colors.border, true: colors.secondary }}
             thumbColor={"#fff"}
             ios_backgroundColor="#3e3e3e"
             onValueChange={toggleSwitch}
             value={isEnabled}
           />
         </View>
-        <View style={styles.divider} />
+        <View style={[styles.divider, { backgroundColor: colors.border }]} />
         
         <View style={styles.setting}>
-          <Text style={styles.subTitle}>Modo Oscuro</Text>
+          <Text style={[styles.subTitle, { color: colors.textDark }]}>Modo Oscuro</Text>
           <Switch
-            trackColor={{ false: theme.colors.border, true: theme.colors.secondary }}
+            trackColor={{ false: colors.border, true: colors.secondary }}
             thumbColor={"#fff"}
             ios_backgroundColor="#3e3e3e"
             onValueChange={toggleDarkMode}
             value={darkMode}
           />
         </View>
-        <View style={styles.divider} />
+        <View style={[styles.divider, { backgroundColor: colors.border }]} />
         
         <View style={styles.setting}>
-          <Text style={styles.subTitle}>Configuración #4</Text>
+          <Text style={[styles.subTitle, { color: colors.textDark }]}>Sincronización Automática</Text>
           <Switch
-            trackColor={{ false: theme.colors.border, true: theme.colors.secondary }}
+            trackColor={{ false: colors.border, true: colors.secondary }}
             thumbColor={"#fff"}
             ios_backgroundColor="#3e3e3e"
-            onValueChange={toggleDarkMode}
-            value={darkMode}
+            onValueChange={()=>{}}
+            value={true}
           />
         </View>
-        <View style={styles.divider} />
+        <View style={[styles.divider, { backgroundColor: colors.border }]} />
         
         <View style={styles.setting}>
-          <Text style={styles.subTitle}>Configuración #5</Text>
+          <Text style={[styles.subTitle, { color: colors.textDark }]}>Actualizaciones en segundo plano</Text>
           <Switch
-            trackColor={{ false: theme.colors.border, true: theme.colors.secondary }}
+            trackColor={{ false: colors.border, true: colors.secondary }}
             thumbColor={"#fff"}
             ios_backgroundColor="#3e3e3e"
-            onValueChange={toggleDarkMode}
-            value={darkMode}
+            onValueChange={()=>{}}
+            value={false}
           />
         </View>
-        <View style={styles.divider} />
         
-        <View style={styles.setting}>
-          <Text style={styles.subTitle}>Configuración #6</Text>
-          <Switch
-            trackColor={{ false: theme.colors.border, true: theme.colors.secondary }}
-            thumbColor={"#fff"}
-            ios_backgroundColor="#3e3e3e"
-            onValueChange={toggleDarkMode}
-            value={darkMode}
-          />
-        </View>
       </View>
       
       <ButtonsSettings />
@@ -82,7 +74,6 @@ const styles = StyleSheet.create({
     width: "100%",
   },
   card: {
-    backgroundColor: theme.colors.card,
     borderRadius: theme.radius.md,
     paddingHorizontal: theme.spacing.medium,
     ...theme.shadow.sm,
@@ -96,11 +87,9 @@ const styles = StyleSheet.create({
   },
   divider: {
     height: 1,
-    backgroundColor: theme.colors.border,
   },
   subTitle: {
     fontSize: theme.fontSizes.base,
-    color: theme.colors.textDark,
     fontWeight: "500",
   },
 });

@@ -16,6 +16,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useModalContext } from '@/features/auth/context/userModalDisplayContext';
 import RutineItem from '@/features/routines/components/RutineItem';
 import theme from '@/core/theme/theme';
+import { useAppTheme } from '@/core/theme/ThemeProvider';
 import { TAB_BAR_HEIGHT, TAB_BAR_BOTTOM_ANDROID, TAB_BAR_BOTTOM_IOS } from '@/core/constants/constants';
 
 const routineTypes = [
@@ -30,6 +31,9 @@ const COLLAPSED_HEIGHT = 80;
 const EXPANDED_HEIGHT = 300;
 
 export default function Rutines() {
+  const { colors } = useAppTheme();
+  const styles = React.useMemo(() => getStyles(colors), [colors]);
+
   const { open } = useModalContext();
   const { session } = useAuthentication();
   const [expanded, setExpanded] = useState<boolean>(false);
@@ -179,10 +183,10 @@ export default function Rutines() {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors: any) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: theme.colors.background,
+    backgroundColor: colors.background,
   },
   header: {
     paddingHorizontal: 20,
@@ -193,12 +197,12 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: theme.fontSizes.xxl,
     fontWeight: 'bold',
-    color: theme.colors.primary,
+    color: colors.primary,
     marginBottom: 8,
   },
   headerSubtitle: {
     fontSize: theme.fontSizes.sm,
-    color: theme.colors.textMuted,
+    color: colors.textMuted,
   },
   routineGrid: {
     flexDirection: 'row',
@@ -214,7 +218,7 @@ const styles = StyleSheet.create({
       : TAB_BAR_BOTTOM_ANDROID + TAB_BAR_HEIGHT,
     left: 0,
     right: 0,
-    backgroundColor: theme.colors.primary,
+    backgroundColor: colors.primary,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     overflow: 'hidden',

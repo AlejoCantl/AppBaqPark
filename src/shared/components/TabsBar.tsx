@@ -9,7 +9,7 @@ import Animated, {
   withDelay,
   withTiming,
 } from "react-native-reanimated";
-import theme from '@/core/theme/theme';
+import { useAppTheme } from '@/core/theme/ThemeProvider';
 import { TAB_BAR_HEIGHT, TAB_BAR_BOTTOM_ANDROID, TAB_BAR_BOTTOM_IOS } from '@/core/constants/constants';
 
 const TAB_BAR_BOTTOM = Platform.OS === "ios" ? TAB_BAR_BOTTOM_IOS : TAB_BAR_BOTTOM_ANDROID;
@@ -24,6 +24,7 @@ const ROUTE_ICONS: Record<string, { active: string; inactive: string }> = {
 
 // ─── Barra flotante animada completamente personalizada ────────────────────────
 function CustomTabBar({ state, navigation }: any) {
+  const { colors } = useAppTheme();
   const translateY = useSharedValue(TAB_BAR_HEIGHT + TAB_BAR_BOTTOM + 20);
   const opacity = useSharedValue(0);
 
@@ -39,7 +40,15 @@ function CustomTabBar({ state, navigation }: any) {
   }));
 
   return (
-    <Animated.View style={[styles.floatingBar, animStyle]}>
+    <Animated.View style={[
+      styles.floatingBar, 
+      animStyle, 
+      { 
+        backgroundColor: colors.card,
+        shadowColor: colors.primary,
+        borderColor: `${colors.secondary}40`
+      }
+    ]}>
       {state.routes.map((route: any, index: number) => {
         const focused = state.index === index;
         const icons = ROUTE_ICONS[route.name] ?? { active: "help-circle", inactive: "help-circle-outline" };
@@ -62,11 +71,14 @@ function CustomTabBar({ state, navigation }: any) {
             style={styles.tabTouchable}
             activeOpacity={0.75}
           >
-            <View style={[styles.iconPill, focused && styles.iconPillActive]}>
+            <View style={[
+              styles.iconPill, 
+              focused && [styles.iconPillActive, { backgroundColor: colors.primary, shadowColor: colors.primary }]
+            ]}>
               <Ionicons
                 name={(focused ? icons.active : icons.inactive) as any}
                 size={22}
-                color={focused ? "#fff" : theme.colors.textMuted}
+                color={focused ? "#fff" : colors.textMuted}
               />
             </View>
           </TouchableOpacity>
@@ -100,21 +112,16 @@ const styles = StyleSheet.create({
     left: 16,
     right: 16,
     height: TAB_BAR_HEIGHT,
-    backgroundColor: "#fff",
     borderRadius: 30,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-around',
     zIndex: 10,
-    // Sombra con tinte verde de la paleta de la app
     elevation: 16,
-    shadowColor: theme.colors.primary,
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.22,
     shadowRadius: 18,
-    // Borde dinámico con color de la paleta (verde claro, semi-transparente)
     borderWidth: 1.5,
-    borderColor: `${theme.colors.secondary}40`,
   },
   tabTouchable: {
     flex: 1,
@@ -126,14 +133,12 @@ const styles = StyleSheet.create({
     width: 48,
     height: 36,
     borderRadius: 18,
-    overflow: 'hidden',        // garantiza que el bg se recorte con borderRadius en Android
+    overflow: 'hidden',        
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: 'transparent',
   },
   iconPillActive: {
-    backgroundColor: theme.colors.primary,
-    shadowColor: theme.colors.primary,
     shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.5,
     shadowRadius: 8,

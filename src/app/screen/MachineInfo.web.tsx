@@ -1,4 +1,4 @@
-import React, { useRef, useState } from "react"
+import React, { useState } from "react";
 import {
   View,
   Text,
@@ -6,16 +6,12 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  Animated,
-  Dimensions,
-} from "react-native"
-import { SafeAreaView } from "react-native-safe-area-context"
-import { Ionicons } from "@expo/vector-icons"
-import { useAppTheme } from "@/core/theme/ThemeProvider"
-import AccountButton from '@/features/auth/components/AccountButton'
+  useWindowDimensions,
+} from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+import { useAppTheme } from '@/core/theme/ThemeProvider';
+import AccountButton from '@/features/auth/components/AccountButton';
 import theme from '@/core/theme/theme';
-
-const { width } = Dimensions.get("window")
 
 const machines = [
   {
@@ -106,158 +102,122 @@ const machines = [
     usage: "Sujete las barras con las manos, extienda los brazos totalmente y luego dóblelos para realizar las flexiones.",
     note: "Se trata de un ejercicio de fuerza que debe realizarse de forma no violenta. En caso de dolor articular, suspender la realización del mismo.",
   },
-]
+];
 
-export default function MachineInfo() {
+export default function MachineInfoWeb() {
   const { colors } = useAppTheme();
   const styles = React.useMemo(() => getStyles(colors), [colors]);
-  const [selectedMachine, setSelectedMachine] = useState(null)
-  const fadeAnim = useRef(new Animated.Value(0)).current
-  const slideAnim = useRef(new Animated.Value(width)).current
-  const scrollY = useRef(new Animated.Value(0)).current
+  const [selectedMachine, setSelectedMachine] = useState(machines[0]);
+  const { width } = useWindowDimensions();
 
-  const handleMachinePress = (machine) => {
-    setSelectedMachine(machine)
-    Animated.parallel([
-      Animated.timing(fadeAnim, {
-        toValue: 1,
-        duration: 400,
-        useNativeDriver: true,
-      }),
-      Animated.timing(slideAnim, {
-        toValue: 0,
-        duration: 400,
-        useNativeDriver: true,
-      }),
-    ]).start()
-  }
-
-  const handleBackPress = () => {
-    Animated.parallel([
-      Animated.timing(fadeAnim, {
-        toValue: 0,
-        duration: 300,
-        useNativeDriver: true,
-      }),
-      Animated.timing(slideAnim, {
-        toValue: width,
-        duration: 300,
-        useNativeDriver: true,
-      }),
-    ]).start(() => {
-      setSelectedMachine(null)
-    })
-  }
-
-  const renderMachineCard = (machine, index) => {
-    const inputRange = [-1, 0, index * 160, (index + 2) * 160]
-
-    const scale = scrollY.interpolate({
-      inputRange,
-      outputRange: [1, 1, 1, 0.9],
-      extrapolate: "clamp",
-    })
-
-    const opacity = scrollY.interpolate({
-      inputRange,
-      outputRange: [1, 1, 1, 0.5],
-      extrapolate: "clamp",
-    })
-
-    return (
-      <Animated.View
-        key={machine.id}
-        style={[
-          styles.machineCard,
-          {
-            transform: [{ scale }],
-            opacity,
-          },
-        ]}
-      >
-        <TouchableOpacity style={styles.cardContent} onPress={() => handleMachinePress(machine)} activeOpacity={0.8}>
-          <Image style={styles.machineImage} source={machine.image} />
-          <View style={styles.machineInfo}>
-            <Text style={styles.machineName}>{machine.name}</Text>
-            <Text style={styles.machinePreview} numberOfLines={2}>
-              {machine.function}
-            </Text>
-          </View>
-          <Ionicons name="chevron-forward" size={24} color={colors.secondary} style={styles.arrowIcon} />
-        </TouchableOpacity>
-      </Animated.View>
-    )
-  }
+  // Layout responsivo
+  const isLargeScreen = width >= 900;
 
   return (
-    <SafeAreaView style={styles.container}>
+    <View style={styles.container}>
       <AccountButton />
+
       <View style={styles.header}>
         <Text style={styles.title}>Máquinas Biosaludables</Text>
+        <Text style={styles.subtitle}>Conoce el equipamiento de los parques y su uso correcto</Text>
       </View>
 
-      {!selectedMachine ? (
-        <Animated.ScrollView
-          style={styles.scrollView}
-          contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}
-          onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], { useNativeDriver: true })}
-          scrollEventThrottle={16}
-        >
-          <Text style={styles.sectionTitle}>Selecciona una máquina</Text>
-          {machines.map(renderMachineCard)}
-        </Animated.ScrollView>
-      ) : (
-        <Animated.View
-          style={[
-            styles.machineDetailContainer,
-            {
-              opacity: fadeAnim,
-              transform: [{ translateX: slideAnim }],
-            },
-          ]}
-        >
-          <TouchableOpacity style={styles.backButton} onPress={handleBackPress} activeOpacity={0.8}>
-            <Ionicons name="arrow-back" size={24} color={colors.textDark} />
-            <Text style={styles.backButtonText}>Volver</Text>
-          </TouchableOpacity>
+      <View style={[styles.mainContainer, isLargeScreen ? styles.rowLayout : styles.columnLayout]}>
 
+        {/* ListView: Master */}
+        <View style={[styles.listContainer, isLargeScreen && { flex: 1, maxWidth: 400 }]}>
           <ScrollView
-            style={styles.detailScrollView}
-            contentContainerStyle={styles.detailContent}
             showsVerticalScrollIndicator={false}
+            contentContainerStyle={styles.scrollList}
           >
-            <Image style={styles.detailImage} source={selectedMachine.image} resizeMode="contain" />
-            <Text style={styles.detailTitle}>{selectedMachine.name}</Text>
-
-            <View style={styles.infoSection}>
-              <View style={styles.infoSectionHeader}>
-                <Ionicons name="body-outline" size={20} color={colors.secondary} />
-                <Text style={styles.infoTitle}>Función</Text>
-              </View>
-              <Text style={styles.infoText}>{selectedMachine.function}</Text>
-            </View>
-
-            <View style={styles.infoSection}>
-              <View style={styles.infoSectionHeader}>
-                <Ionicons name="construct-outline" size={20} color={colors.secondary} />
-                <Text style={styles.infoTitle}>Uso</Text>
-              </View>
-              <Text style={styles.infoText}>{selectedMachine.usage}</Text>
-            </View>
-
-            <View style={[styles.infoSection, styles.noteSection]}>
-              <View style={styles.infoSectionHeader}>
-                <Ionicons name="alert-circle-outline" size={20} color={colors.warning} />
-                <Text style={[styles.infoTitle, { color: colors.warning }]}>Nota Importante</Text>
-              </View>
-              <Text style={styles.infoText}>{selectedMachine.note}</Text>
-            </View>
+            {machines.map((machine) => {
+              const active = selectedMachine.id === machine.id;
+              return (
+                <TouchableOpacity
+                  key={machine.id}
+                  style={[styles.machineCard, active && styles.machineCardActive]}
+                  onPress={() => setSelectedMachine(machine)}
+                  activeOpacity={0.8}
+                >
+                  <View style={styles.cardContent}>
+                    <Image style={styles.machineImage} source={machine.image} />
+                    <View style={styles.machineInfo}>
+                      <Text style={[styles.machineName, active && styles.machineNameActive]}>
+                        {machine.name}
+                      </Text>
+                      <Text style={styles.machinePreview} numberOfLines={2}>
+                        {machine.function}
+                      </Text>
+                    </View>
+                    <Ionicons
+                      name="chevron-forward"
+                      size={20}
+                      color={active ? colors.primary : colors.border}
+                      style={styles.arrowIcon}
+                    />
+                  </View>
+                </TouchableOpacity>
+              )
+            })}
           </ScrollView>
-        </Animated.View>
-      )}
-    </SafeAreaView>
-  )
+        </View>
+
+        {/* DetailView: Detail */}
+        <View style={[styles.detailContainer, isLargeScreen && { flex: 2, marginLeft: 24 }]}>
+          {selectedMachine ? (
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={styles.detailContent}
+            >
+              <View style={styles.detailCard}>
+                <Image
+                  style={styles.detailImage}
+                  source={selectedMachine.image}
+                  resizeMode="contain"
+                />
+                <Text style={styles.detailTitle}>{selectedMachine.name}</Text>
+
+                <View style={styles.infoSection}>
+                  <View style={styles.infoSectionHeader}>
+                    <Ionicons name="body-outline" size={24} color={colors.secondary} />
+                    <Text style={styles.infoTitle}>Función</Text>
+                  </View>
+                  <Text style={styles.infoText}>{selectedMachine.function}</Text>
+                </View>
+
+                <View style={styles.infoSection}>
+                  <View style={styles.infoSectionHeader}>
+                    <Ionicons name="construct-outline" size={24} color={colors.secondary} />
+                    <Text style={styles.infoTitle}>Uso</Text>
+                  </View>
+                  <Text style={styles.infoText}>{selectedMachine.usage}</Text>
+                </View>
+
+                {selectedMachine.note ? (
+                  <View style={[styles.infoSection, styles.noteSection]}>
+                    <View style={styles.infoSectionHeader}>
+                      <Ionicons name="alert-circle-outline" size={24} color={colors.warning} />
+                      <Text style={[styles.infoTitle, { color: colors.warning }]}>
+                        Nota Importante
+                      </Text>
+                    </View>
+                    <Text style={[styles.infoText, { color: colors.textDark }]}>
+                      {selectedMachine.note}
+                    </Text>
+                  </View>
+                ) : null}
+              </View>
+            </ScrollView>
+          ) : (
+            <View style={styles.emptyDetail}>
+              <Text style={styles.emptyText}>Selecciona una máquina para ver sus detalles</Text>
+            </View>
+          )}
+        </View>
+
+      </View>
+    </View>
+  );
 }
 
 const getStyles = (colors: any) => StyleSheet.create({
@@ -268,33 +228,51 @@ const getStyles = (colors: any) => StyleSheet.create({
   header: {
     alignItems: "center",
     justifyContent: "center",
-    paddingTop: 60,
-    paddingBottom: 20,
+    paddingTop: 40,
+    paddingBottom: 24,
     backgroundColor: colors.background,
   },
   title: {
-    fontSize: theme.fontSizes.xl,
+    fontSize: theme.fontSizes.xxl,
     fontWeight: "bold",
     color: colors.primary,
+    marginBottom: 8,
   },
-  scrollView: {
-    flex: 1,
-  },
-  scrollContent: {
-    paddingHorizontal: theme.spacing.medium,
-    paddingBottom: theme.spacing.large * 2,
-  },
-  sectionTitle: {
-    fontSize: theme.fontSizes.lg,
-    fontWeight: "600",
+  subtitle: {
+    fontSize: theme.fontSizes.base,
     color: colors.textMuted,
-    marginBottom: theme.spacing.medium,
+  },
+  mainContainer: {
+    flex: 1,
+    maxWidth: 1400,
+    alignSelf: 'center',
+    width: '100%',
+    paddingHorizontal: 24,
+    paddingBottom: 40,
+  },
+  rowLayout: {
+    flexDirection: 'row',
+  },
+  columnLayout: {
+    flexDirection: 'column',
+  },
+  listContainer: {
+    width: '100%',
+  },
+  scrollList: {
+    paddingBottom: 40,
   },
   machineCard: {
     backgroundColor: colors.card,
     borderRadius: theme.radius.md,
     marginBottom: theme.spacing.medium,
+    borderWidth: 1,
+    borderColor: 'transparent',
     ...theme.shadow.sm,
+  },
+  machineCardActive: {
+    borderColor: colors.primary,
+    backgroundColor: `${colors.primary}08`,
   },
   cardContent: {
     flexDirection: "row",
@@ -305,7 +283,7 @@ const getStyles = (colors: any) => StyleSheet.create({
     width: 60,
     height: 60,
     borderRadius: 8,
-    backgroundColor: colors.background,
+    backgroundColor: 'white',
   },
   machineInfo: {
     flex: 1,
@@ -317,6 +295,9 @@ const getStyles = (colors: any) => StyleSheet.create({
     color: colors.textDark,
     marginBottom: 4,
   },
+  machineNameActive: {
+    color: colors.primary,
+  },
   machinePreview: {
     fontSize: theme.fontSizes.sm,
     color: colors.textMuted,
@@ -324,79 +305,70 @@ const getStyles = (colors: any) => StyleSheet.create({
   arrowIcon: {
     marginLeft: theme.spacing.small,
   },
-  machineDetailContainer: {
-    flex: 1,
-    backgroundColor: colors.background,
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    zIndex: 10,
-  },
-  backButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: theme.spacing.medium,
-    paddingTop: 60,
-    paddingBottom: 10,
-    backgroundColor: colors.background,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-  backButtonText: {
-    marginLeft: theme.spacing.small,
-    fontSize: theme.fontSizes.base,
-    fontWeight: "600",
-    color: colors.textDark,
-  },
-  detailScrollView: {
-    flex: 1,
+  detailContainer: {
+    width: '100%',
+    height: '100%',
   },
   detailContent: {
-    padding: theme.spacing.large,
+    paddingBottom: 40,
+  },
+  detailCard: {
+    backgroundColor: colors.card,
+    borderRadius: theme.radius.lg,
+    padding: 32,
+    borderWidth: 1,
+    borderColor: colors.border,
+    ...theme.shadow.md,
   },
   detailImage: {
     width: "100%",
-    height: 250,
+    height: 300,
     borderRadius: theme.radius.lg,
-    marginBottom: theme.spacing.large,
-    backgroundColor: colors.card,
-    ...theme.shadow.sm,
+    marginBottom: theme.spacing.xl,
+    backgroundColor: '#fff',
   },
   detailTitle: {
-    fontSize: theme.fontSizes.xxl,
-    fontWeight: "bold",
+    fontSize: theme.fontSizes.xxxl,
+    fontWeight: "900",
     color: colors.textDark,
     marginBottom: theme.spacing.xl,
     textAlign: "center",
   },
   infoSection: {
-    backgroundColor: colors.card,
+    backgroundColor: colors.background,
     borderRadius: theme.radius.md,
-    padding: theme.spacing.medium,
+    padding: 24,
     marginBottom: theme.spacing.medium,
-    ...theme.shadow.sm,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
   noteSection: {
     backgroundColor: "#FFF8E1",
     borderColor: colors.warning,
-    borderWidth: 1,
   },
   infoSectionHeader: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: theme.spacing.small,
-    gap: 8,
+    marginBottom: theme.spacing.medium,
+    gap: 12,
   },
   infoTitle: {
-    fontSize: theme.fontSizes.lg,
+    fontSize: theme.fontSizes.xl,
     fontWeight: "bold",
     color: colors.secondary,
   },
   infoText: {
     fontSize: theme.fontSizes.base,
-    lineHeight: 24,
+    lineHeight: 26,
     color: colors.textMuted,
   },
-})
+  emptyDetail: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  emptyText: {
+    color: colors.textMuted,
+    fontSize: theme.fontSizes.lg,
+  }
+});

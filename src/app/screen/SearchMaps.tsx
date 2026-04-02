@@ -40,6 +40,7 @@ import {
 import { DRAWER_MIN_HEIGHT, DRAWER_MAX_HEIGHT } from '@/core/constants/constants'
 import { SkeletonItem } from '@/features/maps/components/SkeletonItem'
 import { ParkInfoModal } from '@/features/maps/components/ParkInfoModal'
+import { useAppTheme } from '@/core/theme/ThemeProvider'
 
 interface Park {
   id: number
@@ -61,6 +62,9 @@ const sectorOptions = [
 
 // Web map placeholder was removed because MapComponent.web.tsx handles it now
 export default function SearchMaps() {
+  const { colors } = useAppTheme()
+  const styles = useMemo(() => getStyles(colors), [colors])
+
   const [showInfoContainer, setShowInfoContainer] = useState(false)
   const [location, setLocation] = useState(null)
   const [nearestPark, setNearestPark] = useState(null)
@@ -240,13 +244,13 @@ export default function SearchMaps() {
         <TouchableOpacity onPress={() => handleParkPress(item)} activeOpacity={0.7}>
           <View style={styles.parkItem}>
             <View style={styles.parkIconBadge}>
-              <MaterialIcons name="park" size={22} color={theme.colors.secondary} />
+              <MaterialIcons name="park" size={22} color={colors.secondary} />
             </View>
             <View style={styles.parkInfo}>
               <Text style={styles.parkName} numberOfLines={1}>{item.column2}</Text>
               <Text style={styles.parkDescription} numberOfLines={1}>{item.column3}</Text>
             </View>
-            <MaterialIcons name="chevron-right" size={20} color={theme.colors.secondary} />
+            <MaterialIcons name="chevron-right" size={20} color={colors.secondary} />
           </View>
         </TouchableOpacity>
       )
@@ -328,7 +332,7 @@ export default function SearchMaps() {
   if (!location) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size={80} color={theme.colors.secondary} />
+        <ActivityIndicator size={80} color={colors.secondary} />
         <Text style={styles.loadingText}>Obteniendo ubicación...</Text>
       </View>
     )
@@ -380,7 +384,7 @@ export default function SearchMaps() {
                 <MaterialIcons
                   name="place"
                   size={16}
-                  color={selectedButton === "cercano" ? "#fff" : theme.colors.secondary}
+                  color={selectedButton === "cercano" ? "#fff" : colors.secondary}
                 />
                 <Text style={[styles.actionBtnText, selectedButton === "cercano" && styles.actionBtnTextActive]}>
                   Cercano
@@ -395,7 +399,7 @@ export default function SearchMaps() {
                 <MaterialIcons
                   name="star"
                   size={16}
-                  color={selectedButton === "optimo" ? "#fff" : theme.colors.secondary}
+                  color={selectedButton === "optimo" ? "#fff" : colors.secondary}
                 />
                 <Text style={[styles.actionBtnText, selectedButton === "optimo" && styles.actionBtnTextActive]}>
                   Óptimo
@@ -407,7 +411,7 @@ export default function SearchMaps() {
                 onPress={() => setShowInfoModal(true)}
                 activeOpacity={0.7}
               >
-                <MaterialIcons name="info-outline" size={20} color={theme.colors.secondary} />
+                <MaterialIcons name="info-outline" size={20} color={colors.secondary} />
               </TouchableOpacity>
             </View>
           </View>
@@ -420,8 +424,8 @@ export default function SearchMaps() {
               value={searchQuery}
               style={styles.searchBar}
               inputStyle={styles.searchInput}
-              icon={() => <MaterialIcons name="search" size={20} color={theme.colors.secondary} />}
-              clearIcon={() => <MaterialIcons name="clear" size={20} color={theme.colors.secondary} />}
+              icon={() => <MaterialIcons name="search" size={20} color={colors.secondary} />}
+              clearIcon={() => <MaterialIcons name="clear" size={20} color={colors.secondary} />}
             />
             <Text style={styles.filterLabel}>Sectores</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filtersRow}>
@@ -448,9 +452,9 @@ export default function SearchMaps() {
             </ScrollView>
             <View style={styles.resultsRow}>
               <Text style={styles.resultsCount}>
-                {filteredParks.length} {filteredParks.length === 1 ? "parque" : "parques"} encontrados
+                {`${filteredParks.length} ${filteredParks.length === 1 ? 'parque' : 'parques'} encontrados`}
               </Text>
-              {(activeSectorFilter || searchQuery) && (
+              {Boolean(activeSectorFilter || searchQuery) && (
                 <TouchableOpacity onPress={clearFilters} style={styles.clearBtn} activeOpacity={0.8}>
                   <MaterialIcons name="refresh" size={14} color="#fff" />
                   <Text style={styles.clearBtnText}>Limpiar</Text>
@@ -486,15 +490,17 @@ export default function SearchMaps() {
             <View style={styles.modalHandle} />
             <Text style={styles.modalTitle}>Tipos de búsqueda</Text>
             <View style={styles.modalInfoRow}>
-              <MaterialIcons name="place" size={24} color={theme.colors.secondary} />
+              <MaterialIcons name="place" size={24} color={colors.secondary} />
               <Text style={styles.modalInfoText}>
-                <Text style={{ fontWeight: "bold" }}>Cercano:</Text> El parque más próximo a tu ubicación actual.
+                <Text style={{ fontWeight: "bold" }}>{"Cercano: "}</Text>
+                <Text>{"El parque más próximo a tu ubicación actual."}</Text>
               </Text>
             </View>
             <View style={styles.modalInfoRow}>
-              <MaterialIcons name="star" size={24} color={theme.colors.secondary} />
+              <MaterialIcons name="star" size={24} color={colors.secondary} />
               <Text style={styles.modalInfoText}>
-                <Text style={{ fontWeight: "bold" }}>Óptimo:</Text> Parque sugerido según preferencias (próximamente).
+                <Text style={{ fontWeight: "bold" }}>{"\u00d3ptimo: "}</Text>
+                <Text>{"Parque sugerido según preferencias (próximamente)."}</Text>
               </Text>
             </View>
             <TouchableOpacity style={styles.modalCloseBtn} onPress={() => setShowInfoModal(false)} activeOpacity={0.8}>
@@ -522,10 +528,10 @@ export default function SearchMaps() {
   )
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: theme.colors.background },
-  loadingContainer: { flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: theme.colors.background, gap: 16 },
-  loadingText: { color: theme.colors.textMuted, fontSize: theme.fontSizes.base },
+const getStyles = (colors: any) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: colors.background },
+  loadingContainer: { flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: colors.background, gap: 16 },
+  loadingText: { color: colors.textMuted, fontSize: theme.fontSizes.base },
   map: { width: "100%", height: "100%", zIndex: 0 },
   // Web map placeholder
   webMapPlaceholder: {
@@ -544,9 +550,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
     ...theme.shadow.md,
   },
-  webMapTitle: { fontSize: theme.fontSizes.xl, fontWeight: "bold", color: theme.colors.primary, textAlign: "center", marginTop: 8 },
-  webMapSubtitle: { fontSize: theme.fontSizes.base, color: theme.colors.textMuted, textAlign: "center" },
-  webMapHint: { fontSize: theme.fontSizes.sm, color: theme.colors.secondary, textAlign: "center", fontWeight: "500" },
+  webMapTitle: { fontSize: theme.fontSizes.xl, fontWeight: "bold", color: colors.primary, textAlign: "center", marginTop: 8 },
+  webMapSubtitle: { fontSize: theme.fontSizes.base, color: colors.textMuted, textAlign: "center" },
+  webMapHint: { fontSize: theme.fontSizes.sm, color: colors.secondary, textAlign: "center", fontWeight: "500" },
   // Tip button
   tipButton: {
     position: "absolute",
@@ -579,7 +585,7 @@ const styles = StyleSheet.create({
   drawerHandle: { alignItems: "center", paddingVertical: 10 },
   handle: { width: 36, height: 4, backgroundColor: "#d0d0d0", borderRadius: 2 },
   drawerHeader: { marginBottom: 10 },
-  drawerTitle: { fontSize: theme.fontSizes.lg, fontWeight: "700", color: theme.colors.primary, marginBottom: 10 },
+  drawerTitle: { fontSize: theme.fontSizes.lg, fontWeight: "700", color: colors.primary, marginBottom: 10 },
   buttonRow: { flexDirection: "row", alignItems: "center", gap: 8 },
   actionBtn: {
     flexDirection: "row",
@@ -589,18 +595,18 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: 20,
     borderWidth: 1.5,
-    borderColor: theme.colors.secondary,
+    borderColor: colors.secondary,
     backgroundColor: "#fff",
   },
-  actionBtnActive: { backgroundColor: theme.colors.secondary, borderColor: theme.colors.secondary },
-  actionBtnText: { fontSize: theme.fontSizes.sm, color: theme.colors.secondary, fontWeight: "600" },
+  actionBtnActive: { backgroundColor: colors.secondary, borderColor: colors.secondary },
+  actionBtnText: { fontSize: theme.fontSizes.sm, color: colors.secondary, fontWeight: "600" },
   actionBtnTextActive: { color: "#fff" },
   infoBtn: {
     width: 36,
     height: 36,
     borderRadius: 18,
     borderWidth: 1.5,
-    borderColor: theme.colors.secondary,
+    borderColor: colors.secondary,
     justifyContent: "center",
     alignItems: "center",
     marginLeft: "auto",
@@ -613,10 +619,10 @@ const styles = StyleSheet.create({
     backgroundColor: "#f0f5ec",
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: theme.colors.border,
+    borderColor: colors.border,
   },
   searchInput: { fontSize: theme.fontSizes.sm },
-  filterLabel: { fontSize: theme.fontSizes.xs, fontWeight: "600", color: theme.colors.textMuted, marginBottom: 8, textTransform: "uppercase", letterSpacing: 0.5 },
+  filterLabel: { fontSize: theme.fontSizes.xs, fontWeight: "600", color: colors.textMuted, marginBottom: 8, textTransform: "uppercase", letterSpacing: 0.5 },
   filtersRow: { paddingBottom: 6, gap: 8 },
   sectorPill: {
     paddingHorizontal: 12,
@@ -629,12 +635,12 @@ const styles = StyleSheet.create({
   sectorPillText: { fontSize: theme.fontSizes.xs, color: "#555", fontWeight: "500" },
   sectorPillTextActive: { color: "#fff", fontWeight: "700" },
   resultsRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: 6 },
-  resultsCount: { fontSize: theme.fontSizes.xs, color: theme.colors.textMuted },
+  resultsCount: { fontSize: theme.fontSizes.xs, color: colors.textMuted },
   clearBtn: {
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
-    backgroundColor: theme.colors.error,
+    backgroundColor: colors.error,
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 12,
@@ -659,8 +665,8 @@ const styles = StyleSheet.create({
     marginRight: 12,
   },
   parkInfo: { flex: 1 },
-  parkName: { fontSize: theme.fontSizes.base, fontWeight: "700", color: theme.colors.textDark },
-  parkDescription: { fontSize: theme.fontSizes.sm, color: theme.colors.textMuted, marginTop: 2 },
+  parkName: { fontSize: theme.fontSizes.base, fontWeight: "700", color: colors.textDark },
+  parkDescription: { fontSize: theme.fontSizes.sm, color: colors.textMuted, marginTop: 2 },
   // Modals
   modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "flex-end" },
   modalSheet: {
@@ -671,11 +677,11 @@ const styles = StyleSheet.create({
     paddingBottom: 40,
   },
   modalHandle: { width: 36, height: 4, backgroundColor: "#d0d0d0", borderRadius: 2, alignSelf: "center", marginBottom: 20 },
-  modalTitle: { fontSize: theme.fontSizes.lg, fontWeight: "700", color: theme.colors.primary, marginBottom: 20 },
+  modalTitle: { fontSize: theme.fontSizes.lg, fontWeight: "700", color: colors.primary, marginBottom: 20 },
   modalInfoRow: { flexDirection: "row", alignItems: "flex-start", gap: 12, marginBottom: 16 },
   modalInfoText: { flex: 1, fontSize: theme.fontSizes.base, color: "#333", lineHeight: 22 },
   modalCloseBtn: {
-    backgroundColor: theme.colors.primary,
+    backgroundColor: colors.primary,
     borderRadius: 14,
     paddingVertical: 14,
     alignItems: "center",
@@ -694,6 +700,6 @@ const styles = StyleSheet.create({
   },
   tipModalHeader: { flexDirection: "row", alignItems: "center", gap: 12, marginBottom: 16 },
   tipModalIcon: { width: 44, height: 44, borderRadius: 22 },
-  tipModalTitle: { fontSize: theme.fontSizes.lg, fontWeight: "700", color: theme.colors.primary },
+  tipModalTitle: { fontSize: theme.fontSizes.lg, fontWeight: "700", color: colors.primary },
   tipText: { fontSize: theme.fontSizes.base, color: "#444", lineHeight: 24 },
 })
